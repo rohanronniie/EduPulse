@@ -6,6 +6,7 @@ from src.academic_engine import evaluate_assignment_completion
 from src.academic_engine import evaluate_assessment_trend
 from src.academic_engine import generate_academic_report
 from src.academic_engine import recommend_interventions
+from src.academic_engine import compare_academic_scenarios
 
 def test_low_attendance_triggers_support_flag():
     result = evaluate_attendance(60)
@@ -189,3 +190,84 @@ def test_insufficient_data_is_reported_separately():
     assert result["recommendations"] == []
     assert len(result["data_gaps"]) == 1
     assert result["data_gaps"][0]["rule"] == "assessment_trend"
+
+
+def test_scenario_comparison_detects_improvements():
+    current = {
+        "attendance_percentage": 60,
+        "assessment_scores": [80, 50],
+        "completed_assignments": 4,
+        "total_assignments": 10,
+    }
+
+    hypothetical = {
+        "attendance_percentage": 80,
+        "assessment_scores": [80, 75],
+        "completed_assignments": 8,
+        "total_assignments": 10,
+    }
+
+    result = compare_academic_scenarios(current, hypothetical)
+
+    assert result["changes"]["attendance"]["status_changed"] is True
+    assert result["changes"]["assessment_trend"]["status_changed"] is True
+    assert result["changes"]["assignment_completion"]["status_changed"] is True
+    assert result["hypothetical_overall_status"] == "no_flag"
+
+
+def test_scenario_comparison_detects_unchanged_statuses():
+    scenario = {
+        "attendance_percentage": 90,
+        "assessment_scores": [70, 75],
+        "completed_assignments": 9,
+        "total_assignments": 10,
+    }
+
+    result = compare_academic_scenarios(scenario, scenario)
+
+    assert result["overall_status_changed"] is False
+
+    for change in result["changes"].values():
+        assert change["status_changed"] is False
+
+
+def test_scenario_comparison_includes_evidence():
+    current = {
+        "attendance_percentage": 60,
+        "assessment_scores": [80, 50],
+        "completed_assignments": 4,
+        "total_assignments": 10,
+    }
+
+    hypothetical = {
+        "attendance_percentage": 80,
+        "assessment_scores": [80, 75],
+        "completed_assignments": 8,
+        "total_assignments": 10,
+    }
+
+    result = compare_academic_scenarios(current, hypothetical)
+    attendance = result["changes"]["attendance"]
+
+    assert attendance["current_evidence"]["attendance_percentage"] == 60
+    assert attendance["hypothetical_evidence"]["attendance_percentage"] == 80
+    assert "current_reason" in attendance
+    assert "hypothetical_reason" in attendance
+
+
+def test_scenario_comparison_rejects_missing_fields():
+    current = {
+        "attendance_percentage": 60,
+        "assessment_scores": [80, 50],
+        "completed_assignments": 4,
+        "total_assignments": 10,
+    }
+
+    incomplete_hypothetical = {
+        "attendance_percentage": 80,
+        "assessment_scores": [80, 75],
+        "completed_assignments": 8,
+    }
+
+    with pytest.raises(ValueError, match="total_assignments"):
+        compare_academic_scenarios(current, incomplete_hypothetical)

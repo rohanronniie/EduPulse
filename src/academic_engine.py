@@ -274,3 +274,77 @@ def recommend_interventions(report):
         "recommendations": recommendations,
         "data_gaps": data_gaps,
     }
+
+
+def _validate_scenario(scenario, scenario_name):
+    """Validate the structure of an academic scenario."""
+
+    required_fields = {
+        "attendance_percentage",
+        "assessment_scores",
+        "completed_assignments",
+        "total_assignments",
+    }
+
+    if not isinstance(scenario, dict):
+        raise ValueError(
+            f"{scenario_name} must be a dictionary."
+        )
+
+    missing_fields = required_fields - scenario.keys()
+
+    if missing_fields:
+        missing = ", ".join(sorted(missing_fields))
+        raise ValueError(
+            f"{scenario_name} is missing required fields: {missing}"
+        )
+
+def compare_academic_scenarios(current_scenario, hypothetical_scenario):
+    """Compare current and hypothetical academic scenarios."""
+
+    _validate_scenario(current_scenario, "Current scenario")
+    _validate_scenario(hypothetical_scenario, "Hypothetical scenario")
+
+    current_report = generate_academic_report(
+        attendance_percentage=current_scenario["attendance_percentage"],
+        assessment_scores=current_scenario["assessment_scores"],
+        completed_assignments=current_scenario["completed_assignments"],
+        total_assignments=current_scenario["total_assignments"],
+    )
+
+    hypothetical_report = generate_academic_report(
+        attendance_percentage=hypothetical_scenario["attendance_percentage"],
+        assessment_scores=hypothetical_scenario["assessment_scores"],
+        completed_assignments=hypothetical_scenario["completed_assignments"],
+        total_assignments=hypothetical_scenario["total_assignments"],
+    )
+
+    
+    changes = {}
+
+    for rule_name, current_finding in current_report["findings"].items():
+        hypothetical_finding = hypothetical_report["findings"][rule_name]
+
+        changes[rule_name] = {
+            "current_status": current_finding["status"],
+            "hypothetical_status": hypothetical_finding["status"],
+            "status_changed": (
+                current_finding["status"]
+                != hypothetical_finding["status"]
+            ),
+            "current_reason": current_finding["reason"],
+            "hypothetical_reason": hypothetical_finding["reason"],
+            "current_evidence": current_finding["evidence"],
+            "hypothetical_evidence": hypothetical_finding["evidence"],
+        }
+
+
+    return {
+        "current_overall_status": current_report["overall_status"],
+        "hypothetical_overall_status": hypothetical_report["overall_status"],
+        "overall_status_changed": (
+            current_report["overall_status"]
+            != hypothetical_report["overall_status"]
+        ),
+        "changes": changes,
+    }
