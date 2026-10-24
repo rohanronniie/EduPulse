@@ -1,0 +1,59 @@
+
+{% extends "base.html" %}
+
+{% block title %}Students | EduPulse{% endblock %}
+{% block topbar_title %}Student Management{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Registered Students</h1>
+        <p>View and manage the students registered in EduPulse.</p>
+    </div>
+
+    <a href="{{ url_for('students.create_student') }}" class="btn btn-primary">
+        + Add Student
+    </a>
+</div>
+
+<section class="card">
+    <h2 class="section-title">Student Directory</h2>
+    <p class="section-description">
+        Student codes and registration details.
+    </p>
+
+    {% if students %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Student Code</th>
+                        <th>Full Name</th>
+                        <th>Registered At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                        <tr>
+                            <td class="student-code">
+                                {{ student.student_code }}
+                            </td>
+                            <td>{{ student.full_name }}</td>
+                            <td>{{ student.created_at.strftime("%d %b %Y") }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No students yet</h3>
+            <p>Register your first student to populate this directory.</p>
+            <a
+                href="{{ url_for('students.create_student') }}"
+                class="btn btn-primary"
+            >Register First Student</a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

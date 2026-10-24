@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EduPulse{% endblock %}</title>
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <a href="{{ url_for('home') }}" class="brand">
+                <span class="brand-mark">E</span>
+                <span>
+                    <span class="brand-name">EduPulse</span>
+                    <span class="brand-caption">ACADEMIC ANALYTICS</span>
+                </span>
+            </a>
+
+            <p class="nav-label">Workspace</p>
+
+            <nav class="sidebar-nav">
+                <a
+                    class="nav-link {% if request.endpoint == 'home' %}active{% endif %}"
+                    href="{{ url_for('home') }}"
+                >Dashboard</a>
+
+                <a
+                    class="nav-link {% if request.endpoint == 'students.list_students' %}active{% endif %}"
+                    href="{{ url_for('students.list_students') }}"
+                >Students</a>
+
+                <a
+                    class="nav-link {% if request.endpoint == 'students.create_student' %}active{% endif %}"
+                    href="{{ url_for('students.create_student') }}"
+                >Add Student</a>
+            </nav>
+
+            <div class="sidebar-footer">
+                Student support through explainable analytics.
+            </div>
+        </aside>
+
+        <div class="main-area">
+            <header class="topbar">
+                <div>
+                    <p class="topbar-title">
+                        {% block topbar_title %}Academic Overview{% endblock %}
+                    </p>
+                    <p class="topbar-subtitle">
+                        Student Performance &amp; Academic Analytics
+                    </p>
+                </div>
+            </header>
+
+            <main class="page-content">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-messages">
+                            {% for category, message in messages %}
+                                <div class="flash {{ category }}" role="status">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+</body>
+</html>

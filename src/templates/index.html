@@ -1,0 +1,58 @@
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard | EduPulse{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+
+{% block content %}
+<section class="welcome-panel">
+    <h2>Welcome to EduPulse</h2>
+    <p>
+        Manage student records and build a clearer picture of academic
+        progress through transparent, evidence-based indicators.
+    </p>
+    <a href="{{ url_for('students.create_student') }}" class="btn btn-primary">
+        + Register Student
+    </a>
+</section>
+
+<div class="page-heading">
+    <div>
+        <h1>Academic Overview</h1>
+        <p>Your workspace for student records and academic support.</p>
+    </div>
+</div>
+
+<div class="card-grid">
+    <section class="card">
+        <p class="stat-label">Student Management</p>
+        <p class="stat-value">01</p>
+        <p class="stat-description">Manage student registrations</p>
+        <p>
+            <a href="{{ url_for('students.list_students') }}">View students →</a>
+        </p>
+    </section>
+
+    <section class="card">
+        <p class="stat-label">Course Management</p>
+        <p class="stat-value">02</p>
+        <p class="stat-description">Course management is coming next.</p>
+    </section>
+
+    <section class="card">
+        <p class="stat-label">Academic Analytics</p>
+        <p class="stat-value">03</p>
+        <p class="stat-description">Explainable academic indicators are planned here.</p>
+    </section>
+</div>
+
+<section class="card">
+    <h2 class="section-title">Getting Started</h2>
+    <p class="section-description">
+        Begin by registering students, then add courses and academic records.
+    </p>
+    <a href="{{ url_for('students.list_students') }}" class="btn btn-secondary">
+        View Registered Students
+    </a>
+</section>
+{% endblock %}
