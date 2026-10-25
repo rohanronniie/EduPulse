@@ -8,8 +8,8 @@
 <section class="welcome-panel">
     <h2>Welcome to EduPulse</h2>
     <p>
-        Manage student records and build a clearer picture of academic
-        progress through transparent, evidence-based indicators.
+        Manage student records and understand academic progress through
+        transparent, explainable indicators that support timely intervention.
     </p>
     <a href="{{ url_for('students.create_student') }}" class="btn btn-primary">
         + Register Student
@@ -25,33 +25,47 @@
 
 <div class="card-grid">
     <section class="card">
-        <p class="stat-label">Student Management</p>
-        <p class="stat-value">01</p>
-        <p class="stat-description">Manage student registrations</p>
+        <p class="stat-label">Registered Students</p>
+        <p class="stat-value">{{ student_count }}</p>
+        <p class="stat-description">Students in the system</p>
         <p>
-            <a href="{{ url_for('students.list_students') }}">View students →</a>
+            <a href="{{ url_for('students.list_students') }}">View students &rarr;</a>
         </p>
     </section>
 
     <section class="card">
-        <p class="stat-label">Course Management</p>
-        <p class="stat-value">02</p>
+        <p class="stat-label">Courses</p>
+        <p class="stat-value">{{ course_count }}</p>
+        <p class="stat-description">Courses available in the system</p>
         <p>
-            <a href="{{ url_for('courses.list_courses') }}">View courses →</a>
+            <a href="{{ url_for('courses.list_courses') }}">View courses &rarr;</a>
         </p>
     </section>
 
     <section class="card">
-        <p class="stat-label">Academic Analytics</p>
-        <p class="stat-value">03</p>
-        <p class="stat-description">Explainable academic indicators are planned here.</p>
+        <p class="stat-label">Enrollments</p>
+        <p class="stat-value">{{ enrollment_count }}</p>
+        <p class="stat-description">Student-course enrollments</p>
+        <p>
+            <a href="{{ url_for('enrollment.list_enrollments') }}">View enrollments &rarr;</a>
+        </p>
+    </section>
+
+    <section class="card">
+        <p class="stat-label">Academic Records</p>
+        <p class="stat-value">{{ academic_record_count }}</p>
+        <p class="stat-description">Saved records available for analysis</p>
+        <p>
+            <a href="{{ url_for('academic.list_records') }}">View records &rarr;</a>
+        </p>
     </section>
 </div>
 
 <section class="card">
     <h2 class="section-title">Getting Started</h2>
     <p class="section-description">
-        Begin by registering students, then add courses and academic records.
+        Register students, add courses, create enrollments, and record academic
+        data to generate explainable reports and explore hypothetical interventions.
     </p>
     <a href="{{ url_for('students.list_students') }}" class="btn btn-secondary">
         View Registered Students
