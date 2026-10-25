@@ -35,9 +35,16 @@
                 >Students</a>
 
                 <a
+                    class="nav-link {% if request.endpoint == 'courses.list_courses' %}active{% endif %}"
+                    href="{{ url_for('courses.list_courses') }}"
+                >Courses</a>
+
+
+                <a
                     class="nav-link {% if request.endpoint == 'students.create_student' %}active{% endif %}"
                     href="{{ url_for('students.create_student') }}"
                 >Add Student</a>
+
             </nav>
 
             <div class="sidebar-footer">

@@ -1,6 +1,7 @@
 
-from flask import Flask
+from flask import Flask, render_template
 
+from src.course_routes import courses_bp
 from src.database import SessionLocal, initialize_database
 from src.student_routes import students_bp
 
@@ -22,8 +23,7 @@ def create_app(test_config=None):
         initialize_database()
 
     app.register_blueprint(students_bp)
-
-    from flask import render_template
+    app.register_blueprint(courses_bp)
 
     @app.route("/")
     def home():

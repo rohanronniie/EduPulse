@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from src import create_app
 from src.database import Base
-from src.models import Student
+from src.models import Course, Student
 
 
 def create_test_app():
@@ -157,6 +157,90 @@ def test_blank_student_registration_is_rejected():
 
         assert response.status_code == 200
         assert b"Student code and full name are required." in response.data
+
+    finally:
+        test_engine.dispose()
+
+
+def test_course_creation_saves_course():
+    app, test_engine = create_test_app()
+
+    try:
+        client = app.test_client()
+
+        response = client.post(
+            "/courses/new",
+            data={
+                "course_code": "CS101",
+                "title": "Introduction to Computer Science",
+            },
+            follow_redirects=True,
+        )
+
+        assert response.status_code == 200
+        assert b"Course created successfully." in response.data
+        assert b"CS101" in response.data
+        assert b"Introduction to Computer Science" in response.data
+
+        with sessionmaker(bind=test_engine)() as session:
+            course = session.scalar(
+                select(Course).where(Course.course_code == "CS101")
+            )
+
+            assert course is not None
+            assert course.title == "Introduction to Computer Science"
+
+    finally:
+        test_engine.dispose()
+
+
+def test_duplicate_course_creation_is_rejected():
+    app, test_engine = create_test_app()
+
+    try:
+        client = app.test_client()
+
+        first_response = client.post(
+            "/courses/new",
+            data={
+                "course_code": "CS102",
+                "title": "Database Systems",
+            },
+        )
+
+        assert first_response.status_code == 302
+
+        second_response = client.post(
+            "/courses/new",
+            data={
+                "course_code": "CS102",
+                "title": "Different Course Title",
+            },
+        )
+
+        assert second_response.status_code == 409
+        assert b"course code already exists" in second_response.data
+
+    finally:
+        test_engine.dispose()
+
+
+def test_blank_course_fields_are_rejected():
+    app, test_engine = create_test_app()
+
+    try:
+        client = app.test_client()
+
+        response = client.post(
+            "/courses/new",
+            data={
+                "course_code": "   ",
+                "title": "   ",
+            },
+        )
+
+        assert response.status_code == 200
+        assert b"Course code and title are required." in response.data
 
     finally:
         test_engine.dispose()
