@@ -4,6 +4,8 @@ from flask import Flask, render_template
 from src.course_routes import courses_bp
 from src.database import SessionLocal, initialize_database
 from src.student_routes import students_bp
+from src.enrollment_routes import enrollment_bp
+from src.academic_routes import academic_bp
 
 
 def create_app(test_config=None):
@@ -24,6 +26,8 @@ def create_app(test_config=None):
 
     app.register_blueprint(students_bp)
     app.register_blueprint(courses_bp)
+    app.register_blueprint(enrollment_bp)
+    app.register_blueprint(academic_bp)
 
     @app.route("/")
     def home():

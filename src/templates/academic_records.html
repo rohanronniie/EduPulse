@@ -1,0 +1,45 @@
+
+{% extends "base.html" %}
+{% block title %}Academic Records | EduPulse{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1>Academic Records</h1>
+    <p>Recorded academic information for enrolled students.</p>
+    <a href="{{ url_for('academic.create_record') }}">Add Academic Record</a>
+</section>
+
+<section class="panel">
+    {% if records %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Course</th>
+                    <th>Attendance</th>
+                    <th>Assessments</th>
+                    <th>Assignments</th>
+                    <th>Report</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                    <tr>
+                        <td>{{ record.student_code }} — {{ record.student_name }}</td>
+                        <td>{{ record.course_code }} — {{ record.course_title }}</td>
+                        <td>{{ record.attendance }}%</td>
+                        <td>{{ record.scores|join(', ') }}</td>
+                        <td>{{ record.completed }}/{{ record.total }}</td>
+                        <td>
+                            <a href="{{ url_for('academic.academic_report', record_id=record.record_id) }}">
+                                View report
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No academic records have been added yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

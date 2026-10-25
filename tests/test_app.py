@@ -7,7 +7,8 @@ from sqlalchemy.pool import StaticPool
 
 from src import create_app
 from src.database import Base
-from src.models import Course, Student
+from src.models import Course, Student, StudentCourse
+from src.academic_models import AcademicRecord
 
 
 def create_test_app():
@@ -241,6 +242,193 @@ def test_blank_course_fields_are_rejected():
 
         assert response.status_code == 200
         assert b"Course code and title are required." in response.data
+
+    finally:
+        test_engine.dispose()
+
+
+def test_enrollment_list_displays_student_and_course():
+    app, test_engine = create_test_app()
+
+    try:
+        client = app.test_client()
+
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(
+                student_code="ENR001",
+                full_name="Enrollment Test Student",
+            )
+            course = Course(
+                course_code="ENR101",
+                title="Enrollment Test Course",
+            )
+            session.add_all([student, course])
+            session.flush()
+
+            session.add(
+                StudentCourse(
+                    student_id=student.id,
+                    course_id=course.id,
+                )
+            )
+            session.commit()
+
+        response = client.get("/enrollments/")
+
+        assert response.status_code == 200
+        assert b"ENR001" in response.data
+        assert b"Enrollment Test Student" in response.data
+        assert b"ENR101" in response.data
+        assert b"Enrollment Test Course" in response.data
+
+    finally:
+        test_engine.dispose()
+
+
+def test_academic_record_creation_and_report():
+    app, test_engine = create_test_app()
+
+    try:
+        client = app.test_client()
+
+        # Create a student and course enrollment.
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(
+                student_code="AC001",
+                full_name="Academic Test Student",
+            )
+            course = Course(
+                course_code="AC101",
+                title="Academic Test Course",
+            )
+            session.add_all([student, course])
+            session.flush()
+
+            enrollment = StudentCourse(
+                student_id=student.id,
+                course_id=course.id,
+            )
+            session.add(enrollment)
+            session.commit()
+            enrollment_id = enrollment.id
+
+        # Save the academic record through the web form.
+        response = client.post(
+            "/academic/records/new",
+            data={
+                "enrollment_id": str(enrollment_id),
+                "attendance_percentage": "62",
+                "assessment_scores": "82, 71, 58",
+                "completed_assignments": "6",
+                "total_assignments": "10",
+            },
+            follow_redirects=True,
+        )
+
+        assert response.status_code == 200
+        assert b"Academic record saved successfully." in response.data
+        assert b"AC001" in response.data
+        assert b"AC101" in response.data
+
+        with sessionmaker(bind=test_engine)() as session:
+            record = session.query(AcademicRecord).one()
+            record_id = record.id
+
+            assert record.attendance_percentage == 62
+            assert record.assessment_scores == [82, 71, 58]
+            assert record.completed_assignments == 6
+            assert record.total_assignments == 10
+
+        # Verify the report renders the engine's explanations.
+        report_response = client.get(
+            f"/academic/records/{record_id}/report"
+        )
+
+        assert report_response.status_code == 200
+        assert b"Academic Support Report" in report_response.data
+        assert b"Attendance" in report_response.data
+        assert b"Assessment Trend" in report_response.data
+        assert b"Assignment Completion" in report_response.data
+
+    finally:
+        test_engine.dispose()
+
+
+def test_what_if_comparison_does_not_modify_saved_record():
+    app, test_engine = create_test_app()
+
+    try:
+        client = app.test_client()
+
+        # Create the enrollment and its current academic record.
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(
+                student_code="WF001",
+                full_name="What If Test Student",
+            )
+            course = Course(
+                course_code="WF101",
+                title="What If Test Course",
+            )
+            session.add_all([student, course])
+            session.flush()
+
+            enrollment = StudentCourse(
+                student_id=student.id,
+                course_id=course.id,
+            )
+            session.add(enrollment)
+            session.flush()
+
+            record = AcademicRecord(
+                student_course_id=enrollment.id,
+                attendance_percentage=62,
+                assessment_scores=[82, 71, 58],
+                completed_assignments=6,
+                total_assignments=10,
+            )
+            session.add(record)
+            session.commit()
+            record_id = record.id
+
+        # Submit hypothetical values.
+        response = client.post(
+            f"/academic/records/{record_id}/what-if",
+            data={
+                "attendance_percentage": "80",
+                "assessment_scores": "82, 78, 85",
+                "completed_assignments": "9",
+                "total_assignments": "10",
+            },
+        )
+
+        assert response.status_code == 200
+        assert b"Comparison Results" in response.data
+        assert b"Current Scenario" in response.data
+        assert b"Hypothetical Scenario" in response.data
+
+        # Confirm the hypothetical inputs were not saved.
+        with sessionmaker(bind=test_engine)() as session:
+            saved_record = session.get(AcademicRecord, record_id)
+
+            assert saved_record.attendance_percentage == 62
+            assert saved_record.assessment_scores == [82, 71, 58]
+            assert saved_record.completed_assignments == 6
+            assert saved_record.total_assignments == 10
+
+    finally:
+        test_engine.dispose()
+
+
+def test_academic_report_returns_404_for_missing_record():
+    app, test_engine = create_test_app()
+
+    try:
+        client = app.test_client()
+
+        response = client.get("/academic/records/9999/report")
+
+        assert response.status_code == 404
 
     finally:
         test_engine.dispose()

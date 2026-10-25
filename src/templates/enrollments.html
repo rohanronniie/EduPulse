@@ -1,0 +1,41 @@
+
+{% extends "base.html" %}
+
+{% block title %}Enrollments | EduPulse{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>Student Enrollments</h1>
+    <p>View which students are associated with each course.</p>
+    <a href="{{ url_for('enrollment.create_enrollment') }}">Enroll Student</a>
+</section>
+
+<section class="panel">
+    {% if enrollments %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Code</th>
+                    <th>Student Name</th>
+                    <th>Course Code</th>
+                    <th>Course Title</th>
+                    <th>Enrolled At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for enrollment in enrollments %}
+                    <tr>
+                        <td>{{ enrollment.student.student_code }}</td>
+                        <td>{{ enrollment.student.full_name }}</td>
+                        <td>{{ enrollment.course.course_code }}</td>
+                        <td>{{ enrollment.course.title }}</td>
+                        <td>{{ enrollment.enrolled_at.strftime('%d %b %Y') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No enrollments yet. Create an enrollment to get started.</p>
+    {% endif %}
+</section>
+{% endblock %}

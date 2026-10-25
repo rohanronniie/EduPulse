@@ -45,6 +45,21 @@
                     href="{{ url_for('students.create_student') }}"
                 >Add Student</a>
 
+                <a
+                    class="nav-link {% if request.endpoint == 'enrollment.list_enrollments' %}active{% endif %}"
+                    href="{{ url_for('enrollment.list_enrollments') }}"
+                >Enrollments</a>
+                
+                <a
+                    class="nav-link {% if request.endpoint == 'academic.list_records' %}active{% endif %}"
+                    href="{{ url_for('academic.list_records') }}"
+                >Academic Records</a>
+
+                <a
+                    class="nav-link {% if request.endpoint == 'academic.create_record' %}active{% endif %}"
+                    href="{{ url_for('academic.create_record') }}"
+                >Add Academic Record</a>
+
             </nav>
 
             <div class="sidebar-footer">

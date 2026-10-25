@@ -514,3 +514,40 @@ input {
         font-size: 25px;
     }
 }
+
+
+/* What-If scenario comparison */
+.comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    margin: 16px 0;
+}
+
+.comparison-card {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid #dce3ed;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.comparison-card h3 {
+    margin-top: 0;
+}
+
+.rule-comparison .comparison-card {
+    background: #f8fafc;
+}
+
+.disclaimer {
+    margin-top: 20px;
+    font-style: italic;
+    color: #64748b;
+}
+
+@media (max-width: 700px) {
+    .comparison-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -39,5 +39,5 @@ class Base(DeclarativeBase):
 def initialize_database():
     """Create database tables defined by registered models."""
     from src import models  # Register model metadata.
-
+    from src import academic_models
     Base.metadata.create_all(bind=engine)

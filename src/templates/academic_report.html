@@ -1,0 +1,50 @@
+
+{% extends "base.html" %}
+{% block title %}Academic Support Report | EduPulse{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1>Academic Support Report</h1>
+    <p>{{ data.student_name }} — {{ data.course_code }}: {{ data.course_title }}</p>
+    <p>This report applies configurable rules to the recorded data. It is not a validated prediction of academic outcomes.</p>
+</section>
+
+<section class="panel">
+    <h2>Overall status: {{ report.overall_status|replace('_', ' ')|title }}</h2>
+    {% for rule_name, finding in report.findings.items() %}
+        <article>
+            <h3>{{ rule_name|replace('_', ' ')|title }}</h3>
+            <p><strong>Status:</strong> {{ finding.status|replace('_', ' ')|title }}</p>
+            <p>{{ finding.reason }}</p>
+        </article>
+    {% endfor %}
+    <h2>Explore a hypothetical scenario</h2>
+    <p>See how changing attendance, assessment scores, or assignment completion could affect the rule-based indicators.</p>
+    <p>
+        <a href="{{ url_for('academic.what_if', record_id=data.record_id) }}">
+            Open What-If Simulator
+        </a>
+    </p>
+</section>
+
+<section class="panel">
+    <h2>Suggested follow-up actions</h2>
+    {% if interventions.recommendations %}
+        <ul>
+            {% for item in interventions.recommendations %}
+                <li>{{ item.action }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No support actions were triggered by the configured rules.</p>
+    {% endif %}
+
+    {% if interventions.data_gaps %}
+        <h3>Data gaps</h3>
+        <ul>
+            {% for gap in interventions.data_gaps %}
+                <li>{{ gap.message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>
+{% endblock %}
