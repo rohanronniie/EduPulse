@@ -4,12 +4,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from src.models import Student
+from src.auth_routes import role_required
 
 
 students_bp = Blueprint("students", __name__, url_prefix="/students")
 
 
 @students_bp.route("/")
+@role_required("faculty")
 def list_students():
     """Display all registered students."""
     session_factory = current_app.config["SESSION_FACTORY"]
@@ -23,6 +25,7 @@ def list_students():
 
 
 @students_bp.route("/new", methods=["GET", "POST"])
+@role_required("faculty")
 def create_student():
     """Display the registration form and create a student."""
     if request.method == "POST":

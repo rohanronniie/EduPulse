@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 
+from src.auth_routes import role_required
 from src.models import Course, Student, StudentCourse
 
 
@@ -22,8 +23,8 @@ enrollment_bp = Blueprint(
 )
 
 
-
 @enrollment_bp.route("/")
+@role_required("faculty")
 def list_enrollments():
     """Display student-course enrollments."""
     session_factory = current_app.config["SESSION_FACTORY"]
@@ -44,8 +45,8 @@ def list_enrollments():
     )
 
 
-
 @enrollment_bp.route("/new", methods=["GET", "POST"])
+@role_required("faculty")
 def create_enrollment():
     """Enroll a student in an existing course."""
     session_factory = current_app.config["SESSION_FACTORY"]

@@ -1,0 +1,38 @@
+
+{% extends "base.html" %}
+
+{% block title %}Sign In | EduPulse{% endblock %}
+{% block topbar_title %}Sign In{% endblock %}
+
+{% block content %}
+<section class="card" style="max-width: 460px; margin: 48px auto;">
+    <h1>Welcome to EduPulse</h1>
+    <p class="section-description">
+        Sign in to access your student or faculty portal.
+    </p>
+
+    <form method="post">
+        <label for="username">Username</label>
+        <input
+            id="username"
+            name="username"
+            type="text"
+            autocomplete="username"
+            required
+        >
+
+        <label for="password">Password</label>
+        <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+        >
+
+        <button class="btn btn-primary" type="submit">
+            Sign In
+        </button>
+    </form>
+</section>
+{% endblock %}

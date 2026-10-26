@@ -13,6 +13,7 @@ from flask import (
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from src.auth_routes import role_required
 from src.academic_engine import (
     compare_academic_scenarios,
     generate_academic_report,
@@ -26,18 +27,16 @@ academic_bp = Blueprint("academic", __name__, url_prefix="/academic")
 
 
 @academic_bp.route("/records")
+@role_required("faculty")
 def list_records():
     """List saved academic records."""
     session_factory = current_app.config["SESSION_FACTORY"]
 
     with session_factory() as session:
         records = session.scalars(
-            select(AcademicRecord)
-            .options()
-            .order_by(AcademicRecord.id.desc())
+            select(AcademicRecord).order_by(AcademicRecord.id.desc())
         ).all()
 
-        # Copy display data while the session is open.
         rows = []
         for record in records:
             enrollment = session.get(StudentCourse, record.student_course_id)
@@ -60,15 +59,20 @@ def list_records():
 
 
 @academic_bp.route("/records/new", methods=["GET", "POST"])
+@role_required("faculty")
 def create_record():
     """Create academic data for a student-course enrollment."""
     session_factory = current_app.config["SESSION_FACTORY"]
 
     if request.method == "POST":
         enrollment_id = request.form.get("enrollment_id", type=int)
-        attendance_text = request.form.get("attendance_percentage", "").strip()
+        attendance_text = request.form.get(
+            "attendance_percentage", ""
+        ).strip()
         scores_text = request.form.get("assessment_scores", "").strip()
-        completed_text = request.form.get("completed_assignments", "").strip()
+        completed_text = request.form.get(
+            "completed_assignments", ""
+        ).strip()
         total_text = request.form.get("total_assignments", "").strip()
 
         try:
@@ -81,8 +85,9 @@ def create_record():
             completed = int(completed_text)
             total = int(total_text)
 
-            # Reuse engine validation before storing the values.
-            generate_academic_report(attendance, scores, completed, total)
+            generate_academic_report(
+                attendance, scores, completed, total
+            )
 
         except (ValueError, TypeError) as exc:
             flash(f"Please check the academic data: {exc}", "error")
@@ -90,12 +95,13 @@ def create_record():
 
         with session_factory() as session:
             enrollments = session.scalars(
-                select(StudentCourse)
-                .options()
-                .order_by(StudentCourse.id)
+                select(StudentCourse).order_by(StudentCourse.id)
             ).all()
 
-            if not enrollment_id or session.get(StudentCourse, enrollment_id) is None:
+            if (
+                not enrollment_id
+                or session.get(StudentCourse, enrollment_id) is None
+            ):
                 flash("Select a valid student-course enrollment.", "error")
                 return render_template(
                     "academic_record_form.html",
@@ -129,8 +135,7 @@ def create_record():
 
     with session_factory() as session:
         enrollments = session.scalars(
-            select(StudentCourse)
-            .order_by(StudentCourse.id)
+            select(StudentCourse).order_by(StudentCourse.id)
         ).all()
 
         choices = []
@@ -152,6 +157,7 @@ def create_record():
 
 
 @academic_bp.route("/records/<int:record_id>/report")
+@role_required("faculty")
 def academic_report(record_id):
     """Generate an explainable report from a saved academic record."""
     session_factory = current_app.config["SESSION_FACTORY"]
@@ -194,7 +200,11 @@ def academic_report(record_id):
     )
 
 
-@academic_bp.route("/records/<int:record_id>/what-if", methods=["GET", "POST"])
+@academic_bp.route(
+    "/records/<int:record_id>/what-if",
+    methods=["GET", "POST"],
+)
+@role_required("faculty")
 def what_if(record_id):
     """Compare saved academic data with a hypothetical scenario."""
     session_factory = current_app.config["SESSION_FACTORY"]

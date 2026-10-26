@@ -11,6 +11,7 @@ from flask import (
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from src.auth_routes import role_required
 from src.models import Course
 
 
@@ -18,6 +19,7 @@ courses_bp = Blueprint("courses", __name__, url_prefix="/courses")
 
 
 @courses_bp.route("/")
+@role_required("faculty")
 def list_courses():
     """Display all registered courses."""
     session_factory = current_app.config["SESSION_FACTORY"]
@@ -31,6 +33,7 @@ def list_courses():
 
 
 @courses_bp.route("/new", methods=["GET", "POST"])
+@role_required("faculty")
 def create_course():
     """Display the course form and create a course."""
     if request.method == "POST":

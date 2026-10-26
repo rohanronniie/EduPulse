@@ -551,3 +551,24 @@ input {
         grid-template-columns: 1fr;
     }
 }
+
+
+.logout-form {
+    margin-top: 16px;
+}
+
+.logout-button {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #d8dee8;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+}
+
+.logout-button:hover {
+    background: rgba(127, 127, 127, 0.12);
+}
