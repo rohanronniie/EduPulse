@@ -1,0 +1,53 @@
+
+{% extends "base.html" %}
+
+{% block title %}Attendance | EduPulse{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <p class="eyebrow">FACULTY WORKSPACE</p>
+        <h1>Attendance Management</h1>
+        <p>Select one of your assigned courses to record a class session.</p>
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-heading">
+        <h2>Your assigned courses</h2>
+        <span>{{ courses|length }} course(s)</span>
+    </div>
+
+    {% if courses %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Course code</th>
+                        <th>Course name</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in courses %}
+                    <tr>
+                        <td>{{ course.course_code }}</td>
+                        <td>{{ course.title }}</td>
+                        <td>
+                            <a
+                                class="button"
+                                href="{{ url_for('attendance.take_attendance', course_id=course.id) }}"
+                            >
+                                Take attendance
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>No courses are assigned to your account yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

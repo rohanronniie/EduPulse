@@ -1,0 +1,85 @@
+
+{% extends "base.html" %}
+
+{% block title %}Take Attendance | EduPulse{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <p class="eyebrow">{{ course.course_code }}</p>
+        <h1>Take Attendance</h1>
+        <p>{{ course.title }}</p>
+    </div>
+    <a class="button button-secondary" href="{{ url_for('attendance.list_courses') }}">
+        Back to courses
+    </a>
+</section>
+
+<form method="POST" class="card">
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="session_date">Class date</label>
+            <input
+                type="date"
+                id="session_date"
+                name="session_date"
+                value="{{ today }}"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="topic">Class topic (optional)</label>
+            <input
+                type="text"
+                id="topic"
+                name="topic"
+                maxlength="200"
+                placeholder="e.g. Introduction to Machine Learning"
+            >
+        </div>
+    </div>
+
+    <div class="section-heading">
+        <h2>Student roster</h2>
+        <span>{{ students|length }} student(s)</span>
+    </div>
+
+    {% if students %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student code</th>
+                        <th>Student name</th>
+                        <th>Attendance status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td>{{ student.student_code }}</td>
+                        <td>{{ student.full_name }}</td>
+                        <td>
+                            <select name="status_{{ student.id }}" required>
+                                <option value="present" selected>Present</option>
+                                <option value="absent">Absent</option>
+                                <option value="late">Late</option>
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="button">
+                Save attendance
+            </button>
+        </div>
+    {% else %}
+        <p>No students are enrolled in this course. Enroll students before recording attendance.</p>
+    {% endif %}
+</form>
+{% endblock %}

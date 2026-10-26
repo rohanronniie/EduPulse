@@ -5,10 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}EduPulse{% endblock %}</title>
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='css/style.css') }}"
-    >
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="app-layout">
@@ -17,74 +14,95 @@
                 <span class="brand-mark">E</span>
                 <span>
                     <span class="brand-name">EduPulse</span>
-                    <span class="brand-caption">ACADEMIC ANALYTICS</span>
+                    <span class="brand-caption">Academic Portal</span>
                 </span>
             </a>
 
-            <p class="nav-label">Workspace</p>
+            {% if current_user %}
+                <p class="nav-label">
+                    {{ 'Student Portal' if current_user.role == 'student' else 'Faculty Workspace' }}
+                </p>
 
-            <nav class="sidebar-nav">
-                <a
-                    class="nav-link {% if request.endpoint == 'home' %}active{% endif %}"
-                    href="{{ url_for('home') }}"
-                >Dashboard</a>
+                <nav class="sidebar-nav">
+                    <a class="nav-link" href="{{ url_for('home') }}">
+                        Dashboard
+                    </a>
 
-                <a
-                    class="nav-link {% if request.endpoint == 'students.list_students' %}active{% endif %}"
-                    href="{{ url_for('students.list_students') }}"
-                >Students</a>
+                    {% if current_user.role == 'faculty' %}
+                        <p class="nav-label">Management</p>
 
-                <a
-                    class="nav-link {% if request.endpoint == 'courses.list_courses' %}active{% endif %}"
-                    href="{{ url_for('courses.list_courses') }}"
-                >Courses</a>
+                        <a class="nav-link" href="{{ url_for('students.list_students') }}">
+                            Students
+                        </a>
 
+                        <a class="nav-link" href="{{ url_for('courses.list_courses') }}">
+                            Courses
+                        </a>
 
-                <a
-                    class="nav-link {% if request.endpoint == 'students.create_student' %}active{% endif %}"
-                    href="{{ url_for('students.create_student') }}"
-                >Add Student</a>
+                        <a class="nav-link" href="{{ url_for('enrollment.list_enrollments') }}">
+                            Enrollments
+                        </a>
 
-                <a
-                    class="nav-link {% if request.endpoint == 'enrollment.list_enrollments' %}active{% endif %}"
-                    href="{{ url_for('enrollment.list_enrollments') }}"
-                >Enrollments</a>
-                
-                <a
-                    class="nav-link {% if request.endpoint == 'academic.list_records' %}active{% endif %}"
-                    href="{{ url_for('academic.list_records') }}"
-                >Academic Records</a>
+                        <a class="nav-link" href="{{ url_for('attendance.list_courses') }}">
+                            Attendance
+                        </a>
 
-                <a
-                    class="nav-link {% if request.endpoint == 'academic.create_record' %}active{% endif %}"
-                    href="{{ url_for('academic.create_record') }}"
-                >Add Academic Record</a>
+                        <p class="nav-label">Academic</p>
 
-            </nav>
+                        <a class="nav-link" href="{{ url_for('academic.list_records') }}">
+                            Academic Records
+                        </a>
 
-            <div class="sidebar-footer">
-                Student support through explainable analytics.
-            </div>
+                        <a class="nav-link" href="{{ url_for('students.create_student') }}">
+                            Add Student
+                        </a>
+
+                        <a class="nav-link" href="{{ url_for('courses.create_course') }}">
+                            Add Course
+                        </a>
+
+                        <a class="nav-link" href="{{ url_for('enrollment.create_enrollment') }}">
+                            Add Enrollment
+                        </a>
+
+                        <a class="nav-link" href="{{ url_for('academic.create_record') }}">
+                            Add Academic Record
+                        </a>
+                    {% endif %}
+                </nav>
+
+                <div class="sidebar-footer">
+                    Signed in as<br>
+                    <strong>{{ current_user.username }}</strong>
+                    <form action="{{ url_for('auth.logout') }}"
+                          method="post"
+                          class="logout-form">
+                        <button type="submit" class="logout-button">
+                            Logout
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
         </aside>
 
-        <div class="main-area">
+        <main class="main-area">
             <header class="topbar">
                 <div>
-                    <p class="topbar-title">
-                        {% block topbar_title %}Academic Overview{% endblock %}
-                    </p>
+                    <h2 class="topbar-title">
+                        {% block topbar_title %}Dashboard{% endblock %}
+                    </h2>
                     <p class="topbar-subtitle">
                         Student Performance &amp; Academic Analytics
                     </p>
                 </div>
             </header>
 
-            <main class="page-content">
+            <section class="page-content">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         <div class="flash-messages">
                             {% for category, message in messages %}
-                                <div class="flash {{ category }}" role="status">
+                                <div class="flash {{ category }}">
                                     {{ message }}
                                 </div>
                             {% endfor %}
@@ -93,8 +111,8 @@
                 {% endwith %}
 
                 {% block content %}{% endblock %}
-            </main>
-        </div>
+            </section>
+        </main>
     </div>
 </body>
 </html>
