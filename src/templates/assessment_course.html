@@ -1,0 +1,111 @@
+
+{% extends "base.html" %}
+
+{% block title %}{{ course.course_code }} Assessments | EduPulse{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <p class="eyebrow">{{ course.course_code }}</p>
+        <h1>{{ course.title }}</h1>
+        <p>Create assessments and manage their publication status.</p>
+    </div>
+    <a class="button button-secondary"
+       href="{{ url_for('assessment.list_courses') }}">
+        Back to courses
+    </a>
+</section>
+
+<section class="card">
+    <h2>Create assessment</h2>
+
+    <form method="POST"
+          action="{{ url_for('assessment.course_assessments', course_id=course.id) }}">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="title">Assessment title</label>
+                <input type="text" id="title" name="title"
+                       maxlength="150" required
+                       placeholder="e.g. Internal Assessment 1">
+            </div>
+
+            <div class="form-group">
+                <label for="max_marks">Maximum marks</label>
+                <input type="number" id="max_marks" name="max_marks"
+                       min="0.01" step="any" required>
+            </div>
+
+            <div class="form-group">
+                <label for="assessment_date">Assessment date</label>
+                <input type="date" id="assessment_date"
+                       name="assessment_date" value="{{ today }}" required>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="button">Create assessment</button>
+        </div>
+    </form>
+</section>
+
+<section class="card">
+    <div class="section-heading">
+        <h2>Assessments</h2>
+        <span>{{ assessments|length }} assessment(s)</span>
+    </div>
+
+    {% if assessments %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Assessment</th>
+                    <th>Date</th>
+                    <th>Maximum</th>
+                    <th>Results</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for assessment in assessments %}
+                <tr>
+                    <td>{{ assessment.title }}</td>
+                    <td>{{ assessment.assessment_date.strftime('%d %b %Y') }}</td>
+                    <td>{{ assessment.max_marks }}</td>
+                    <td>
+                        {% if assessment.published %}
+                            <span class="status-badge status-success">Published</span>
+                        {% else %}
+                            <span class="status-badge">Draft</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a class="button"
+                           href="{{ url_for('assessment.enter_marks', assessment_id=assessment.id) }}">
+                            {% if assessment.published %}
+                                View marks
+                            {% else %}
+                                Enter marks
+                            {% endif %}
+                        </a>
+
+                        {% if not assessment.published %}
+                        <form method="POST"
+                              action="{{ url_for('assessment.publish_results', assessment_id=assessment.id) }}"
+                              class="inline-form">
+                            <button type="submit" class="button button-secondary">
+                                Publish results
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No assessments created for this course yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

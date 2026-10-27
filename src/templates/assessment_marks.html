@@ -1,0 +1,73 @@
+
+{% extends "base.html" %}
+
+{% block title %}Enter Marks | EduPulse{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <p class="eyebrow">{{ course.course_code }}</p>
+        <h1>{{ assessment.title }}</h1>
+        <p>
+            Maximum marks: {{ assessment.max_marks }}
+            · {{ assessment.assessment_date.strftime('%d %b %Y') }}
+        </p>
+    </div>
+    <a class="button button-secondary"
+       href="{{ url_for('assessment.course_assessments', course_id=course.id) }}">
+        Back to assessments
+    </a>
+</section>
+
+<section class="card">
+    {% if assessment.published %}
+        <p>These results are published and cannot be edited.</p>
+    {% else %}
+        <p>Enter a mark for every enrolled student before saving.</p>
+    {% endif %}
+
+    {% if students %}
+    <form method="POST"
+          action="{{ url_for('assessment.enter_marks', assessment_id=assessment.id) }}">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student code</th>
+                        <th>Student name</th>
+                        <th>Marks / {{ assessment.max_marks }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td>{{ student.student_code }}</td>
+                        <td>{{ student.full_name }}</td>
+                        <td>
+                            {% set saved_mark = marks_by_student.get(student.id) %}
+                            <input type="number"
+                                   name="marks_{{ student.id }}"
+                                   min="0"
+                                   max="{{ assessment.max_marks }}"
+                                   step="any"
+                                   value="{{ saved_mark.marks if saved_mark else '' }}"
+                                   required
+                                   {% if assessment.published %}disabled{% endif %}>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if not assessment.published %}
+        <div class="form-actions">
+            <button type="submit" class="button">Save marks</button>
+        </div>
+        {% endif %}
+    </form>
+    {% else %}
+    <p>No students are enrolled in this course.</p>
+    {% endif %}
+</section>
+{% endblock %}

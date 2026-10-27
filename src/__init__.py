@@ -19,6 +19,7 @@ from src.portal_models import (
 )
 from src.auth_routes import auth_bp, login_required, get_current_user
 from src.attendance_routes import attendance_bp
+from src.assessment_routes import assessment_bp
 
 
 def create_app(test_config=None):
@@ -43,6 +44,7 @@ def create_app(test_config=None):
     app.register_blueprint(academic_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(attendance_bp)
+    app.register_blueprint(assessment_bp)
     
     @app.context_processor
     def inject_current_user():
