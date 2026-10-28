@@ -1,0 +1,263 @@
+
+{% extends "base.html" %}
+
+{% block title %}Analytics | EduPulse{% endblock %}
+{% block topbar_title %}Academic Analytics{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <h1>Academic Analytics</h1>
+    <p>
+        Review attendance and published assessment performance
+        across your assigned subjects.
+    </p>
+</section>
+
+{% if course_analytics %}
+    <section class="card">
+        <h2>Course Performance</h2>
+
+        <div class="table-wrapper">
+            <table class="analytics-table">
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Enrolled Students</th>
+                        <th>Attendance Rate</th>
+                        <th>Published Assessments</th>
+                        <th>Average Score</th>
+                        <th>Lowest Score</th>
+                        <th>Highest Score</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in course_analytics %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.course.title }}</strong>
+                                <br>
+                                <small>{{ item.course.course_code }}</small>
+                            </td>
+
+                            <td>{{ item.student_count }}</td>
+
+                            <td>
+                                {% if item.attendance_percentage is not none %}
+                                    {{ item.attendance_percentage }}%
+                                {% else %}
+                                    No data
+                                {% endif %}
+                            </td>
+
+                            <td>{{ item.published_assessment_count }}</td>
+
+                            <td>
+                                {% if item.average_percentage is not none %}
+                                    {{ item.average_percentage }}%
+                                {% else %}
+                                    No published marks
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if item.lowest_percentage is not none %}
+                                    {{ item.lowest_percentage }}%
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if item.highest_percentage is not none %}
+                                    {{ item.highest_percentage }}%
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="analytics-chart-grid">
+        <article class="card analytics-chart-card">
+            <h2>Attendance by Subject</h2>
+
+            <p class="analytics-description">
+                Percentage of recorded class entries marked present or late.
+            </p>
+
+            <div
+                id="attendanceBars"
+                class="analytics-bars"
+                role="group"
+                aria-label="Attendance percentage by subject"
+            ></div>
+
+            <p id="attendanceEmpty" class="analytics-empty" hidden>
+                No attendance data is available yet.
+            </p>
+        </article>
+
+        <article class="card analytics-chart-card">
+            <h2>Assessment Performance</h2>
+
+            <p class="analytics-description">
+                Average percentage across published assessment marks.
+            </p>
+
+            <div
+                id="assessmentBars"
+                class="analytics-bars"
+                role="group"
+                aria-label="Average published assessment score by subject"
+            ></div>
+
+            <p id="assessmentEmpty" class="analytics-empty" hidden>
+                No published assessment marks are available yet.
+            </p>
+        </article>
+    </section>
+
+{% else %}
+    <section class="card">
+        <h2>No assigned subjects</h2>
+        <p>
+            Analytics will appear here after subjects are assigned
+            to your faculty account.
+        </p>
+    </section>
+{% endif %}
+{% endblock %}
+
+
+{% block scripts %}
+{{ super() }}
+
+{% if course_analytics %}
+<script>
+(function () {
+    "use strict";
+
+    const courseLabels = {{ course_analytics | map(attribute='course.title') | list | tojson }};
+    const attendanceValues = {{ course_analytics | map(attribute='attendance_percentage') | list | tojson }};
+    const assessmentValues = {{ course_analytics | map(attribute='average_percentage') | list | tojson }};
+
+    function escapeHtml(value) {
+        const entities = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        };
+
+        return String(value).replace(/[&<>"']/g, function (character) {
+            return entities[character];
+        });
+    }
+
+    function renderBars(containerId, emptyId, labels, values) {
+        const container = document.getElementById(containerId);
+        const emptyMessage = document.getElementById(emptyId);
+
+        if (!container || !emptyMessage) {
+            console.error(
+                "EduPulse Analytics: missing chart element",
+                containerId
+            );
+            return;
+        }
+
+        const validData = labels
+            .map(function (label, index) {
+                return {
+                    label: label,
+                    value: values[index]
+                };
+            })
+            .filter(function (item) {
+                return (
+                    item.value !== null &&
+                    item.value !== undefined &&
+                    item.value !== "" &&
+                    Number.isFinite(Number(item.value))
+                );
+            });
+
+        if (validData.length === 0) {
+            container.replaceChildren();
+            container.hidden = true;
+            emptyMessage.hidden = false;
+            return;
+        }
+
+        emptyMessage.hidden = true;
+        container.hidden = false;
+
+        container.innerHTML = validData.map(function (item) {
+            const numericValue = Number(item.value);
+            const value = Math.max(0, Math.min(100, numericValue));
+            const safeLabel = escapeHtml(item.label);
+
+            return `
+                <div class="analytics-bar-row">
+                    <div
+                        class="analytics-bar-label"
+                        title="${safeLabel}"
+                    >${safeLabel}</div>
+
+                    <div
+                        class="analytics-bar-track"
+                        role="progressbar"
+                        aria-label="${safeLabel}"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="${value}"
+                    >
+                        <div
+                            class="analytics-bar-fill"
+                            style="width: ${value}%"
+                        ></div>
+                    </div>
+
+                    <div class="analytics-bar-value">
+                        ${value.toFixed(1)}%
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    function initializeAnalytics() {
+        renderBars(
+            "attendanceBars",
+            "attendanceEmpty",
+            courseLabels,
+            attendanceValues
+        );
+
+        renderBars(
+            "assessmentBars",
+            "assessmentEmpty",
+            courseLabels,
+            assessmentValues
+        );
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener(
+            "DOMContentLoaded",
+            initializeAnalytics,
+            { once: true }
+        );
+    } else {
+        initializeAnalytics();
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}

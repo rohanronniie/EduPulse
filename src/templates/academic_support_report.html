@@ -1,0 +1,87 @@
+
+{% extends "base.html" %}
+
+{% block title %}Academic Support Report | EduPulse{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>Academic Support Report</h1>
+    <p>{{ course.title }} ({{ course.course_code }})</p>
+    <a href="{{ url_for('academic_support.index') }}">
+        Back to courses
+    </a>
+</section>
+
+{% if reports %}
+    {% for item in reports %}
+        <section class="card academic-report-card">
+            <h2>{{ item.student.full_name }}</h2>
+            <p>Student ID: {{ item.student.student_code }}</p>
+
+            <p>
+                <strong>Overall status:</strong>
+                {{ item.report.overall_status | replace('_', ' ') | title }}
+            </p>
+
+            <h3>Evidence and findings</h3>
+
+            {% for rule_name, finding in item.report.findings.items() %}
+                <div class="finding">
+                    <h4>
+                        {{ rule_name | replace('_', ' ') | title }}
+                        — {{ finding.status | replace('_', ' ') | title }}
+                    </h4>
+
+                    <p>{{ finding.reason }}</p>
+                </div>
+            {% endfor %}
+
+            <h3>Suggested interventions</h3>
+
+            {% if item.interventions.recommendations %}
+                <ul>
+                    {% for recommendation in item.interventions.recommendations %}
+                        <li>{{ recommendation }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No intervention recommendations were generated.</p>
+            {% endif %}
+
+            {% if item.interventions.data_gaps %}
+                <h3>Missing information</h3>
+                <ul>
+                    {% for gap in item.interventions.data_gaps %}
+                        <li>{{ gap }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            {% if item.attendance_percentage is none %}
+                <p>Attendance: No recorded attendance data.</p>
+            {% else %}
+                <p>
+                    Attendance: {{ "%.1f"|format(
+                        item.attendance_percentage
+                    ) }}%
+                </p>
+            {% endif %}
+
+            <p>
+                Published assessment results available:
+                {{ item.assessment_count }}
+            </p>
+
+            {% if not item.assignment_data_available %}
+                <p>
+                    Assignment completion has no academic record yet.
+                </p>
+            {% endif %}
+        </section>
+    {% endfor %}
+{% else %}
+    <section class="card">
+        <p>No students are currently enrolled in this course.</p>
+    </section>
+{% endif %}
+{% endblock %}

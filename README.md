@@ -1,92 +1,130 @@
+# EduPulse
+### Student Performance & Academic Analytics System
 
-# EduPulse — Student Performance & Academic Analytics System
+EduPulse is a web application for managing student academic records and identifying areas where additional academic support may be needed. It brings attendance, assessment results, and assignment completion into one place, with explanations that show how each academic indicator was generated.
 
-EduPulse is a web-based academic analytics application designed to organize student academic records and generate transparent, explainable indicators that can help identify where additional academic support may be useful.
+Rather than treating academic performance as a black-box prediction, EduPulse uses transparent, rule-based evaluation. Faculty can review the evidence behind an indicator, explore possible interventions through a What-If simulator, and use course-level analytics to understand academic activity.
 
-The system combines attendance, assessment performance trends, and assignment completion into understandable findings. It also includes a What-If Intervention Simulator to explore hypothetical changes to academic inputs without modifying saved records.
+The project focuses on three practical engineering concerns: **explainable evaluation, controlled access to academic information, and reliable handling of student records.**
 
-## Key Features
+## Features
 
-### Student and Course Management
-- Register and view student records.
-- Create and manage courses.
-- Enroll students in courses.
-- Prevent duplicate student codes, course codes, and student-course enrollments.
+### Academic records and evaluation
 
-### Academic Record Management
-- Record attendance percentages.
-- Store assessment scores and track performance trends.
-- Record completed and total assignments.
-- Associate academic records with student-course enrollments.
+- Manage students, courses, and course enrollments.
+- Maintain attendance percentages, assessment scores, and assignment completion data.
+- Evaluate academic records using configurable rules.
+- Identify attendance concerns, declining assessment performance, and low assignment completion.
+- Generate reports containing the reason for each finding and the supporting evidence.
+- Provide intervention suggestions for faculty review.
 
-### Explainable Academic Analytics
-- Evaluate attendance against a configurable threshold.
-- Identify assessment score declines.
-- Evaluate assignment completion rates.
-- Generate findings with reasons and supporting evidence.
-- Suggest possible academic support interventions based on the findings.
+### What-If intervention simulator
 
-### What-If Intervention Simulator
-- Compare saved academic inputs with a hypothetical scenario.
-- Review how changed inputs affect the rule-based findings.
-- Keep the saved academic record unchanged during scenario comparison.
+Faculty can explore hypothetical changes to attendance, assessment scores, and assignment completion to see how the evaluation changes. The simulation compares the proposed scenario with the existing record without modifying the saved academic data.
 
-### Dashboard
-- Display live counts of registered students, courses, enrollments, and academic records.
-- Provide navigation to the application's main workflows.
+### Faculty and student portals
 
-## Technology Stack
+- Role-based authentication for faculty and students.
+- Faculty access to assigned courses, attendance management, assessment creation, marks entry, and result publishing.
+- Student access to their academic information and published assessment results.
+- Access restrictions that prevent students from opening faculty-only pages.
+- Attendance and assessment workflows tied to course enrollment.
 
-| Component | Technology |
+### Analytics dashboard
+
+The faculty analytics dashboard brings together academic activity and course-level information to make the underlying records easier to review.
+
+### Validation and security
+
+- Input validation for academic records, marks, and assessment data.
+- Duplicate checks for student codes, course codes, and enrollments.
+- Flask-WTF CSRF protection for form submissions.
+- Environment-based application secret configuration.
+- Automated tests covering the evaluation logic, validation, routes, and application workflows.
+
+## Technology
+
+| Area | Technology |
 |---|---|
-| Backend | Python, Flask |
-| Database access | SQLAlchemy |
+| Language | Python |
+| Web framework | Flask |
 | Database | SQLite |
-| Frontend | HTML, CSS, JavaScript |
+| Database toolkit | SQLAlchemy |
+| Frontend | HTML, CSS, JavaScript, Jinja |
+| Security | Flask-WTF, session-based authentication |
 | Testing | pytest |
-| Version control | Git and GitHub |
+| Version control | Git, GitHub |
 
-## Application Architecture
+## How the evaluation works
 
-The application uses a modular Flask structure.
+EduPulse currently uses a rule-based academic evaluation engine, not a trained machine-learning model.
 
-- `src/__init__.py` — application factory, configuration, blueprint registration, and dashboard.
-- `src/database.py` — database engine, session factory, and database initialization.
-- `src/models.py` — student, course, and enrollment models.
-- `src/academic_models.py` — academic record model.
-- `src/academic_engine.py` — rule-based academic evaluation, report generation, intervention recommendations, and scenario comparison.
-- `src/student_routes.py` — student management routes.
-- `src/course_routes.py` — course management routes.
-- `src/enrollment_routes.py` — enrollment management routes.
-- `src/academic_routes.py` — academic record, report, and What-If routes.
-- `src/templates/` — Jinja templates for the web interface.
-- `src/static/` — static assets, including stylesheets.
-- `tests/` — automated tests.
+The engine examines three indicators:
 
-## Getting Started
+1. **Attendance:** compares attendance against a configured threshold.
+2. **Assessment trend:** checks for a significant decline between assessment scores.
+3. **Assignment completion:** compares completed assignments with the total assigned.
+
+Each finding includes a status, an explanation, and supporting values. Where appropriate, the report also suggests possible academic support interventions.
+
+This design makes the evaluation easier to inspect and test. It also keeps the system honest about what it can establish: a rule-based indicator can highlight a concern, but it cannot establish that a student will fail or predict an individual's future performance.
+
+Thresholds are configurable demonstration settings. They have not been established as universally valid measures of academic success.
+
+## Application structure
+
+The project follows a modular Flask structure, separating database models, academic evaluation, route handlers, and templates.
+
+```text
+EduPulse/
+├── src/
+│   ├── __init__.py
+│   ├── database.py
+│   ├── models.py
+│   ├── academic_models.py
+│   ├── academic_engine.py
+│   ├── portal_models.py
+│   ├── auth_routes.py
+│   ├── student_routes.py
+│   ├── course_routes.py
+│   ├── enrollment_routes.py
+│   ├── academic_routes.py
+│   ├── academic_support_routes.py
+│   ├── attendance_routes.py
+│   ├── assessment_routes.py
+│   ├── analytics_routes.py
+│   ├── templates/
+│   └── static/
+├── tests/
+├── requirements.txt
+├── run.py
+├── seed_demo.py
+└── README.md
+```
+
+The academic evaluation engine is kept separate from the web interface, allowing its rules to be tested independently. Database models represent academic records, enrollments, user accounts, attendance sessions, assessments, and marks. Route modules handle the corresponding application workflows.
+
+## Getting started
 
 ### Prerequisites
 
-- Python 3.14 or a compatible Python version supported by the pinned dependencies.
+- Python 3.14, as used during development.
 - Git.
+- Windows PowerShell or another terminal that supports the commands below.
 
 ### 1. Clone the repository
 
-```bash
+```powershell
 git clone https://github.com/rohanronniie/EduPulse.git
 cd EduPulse
 ```
 
-### 2. Create a virtual environment
-
-Windows PowerShell:
+### 2. Create and activate a virtual environment
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
-
-If PowerShell blocks environment activation, you can use the environment's Python executable directly.
 
 ### 3. Install dependencies
 
@@ -94,76 +132,84 @@ If PowerShell blocks environment activation, you can use the environment's Pytho
 python -m pip install -r requirements.txt
 ```
 
-### 4. Run the application
+### 4. Configure the application secret
+
+EduPulse requires an application secret key when running outside the test configuration. Generate one in PowerShell:
+
+```powershell
+$env:EDUPULSE_SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+This sets the key for the current terminal session. If you open a new terminal, set it again before starting the application.
+
+For a persistent deployment, configure `EDUPULSE_SECRET_KEY` through the deployment environment rather than hard-coding it in the source code.
+
+### 5. Start the application
 
 ```powershell
 python run.py
 ```
 
-Open the application at:
+Open the local address printed by Flask, normally:
 
-http://127.0.0.1:5000
+`http://127.0.0.1:5000`
 
-The application initializes its SQLite database when configured to do so.
+The application initializes its SQLite database according to its configuration.
 
-### 5. Run the tests
+### 6. Load demonstration data (optional)
 
-Stop the development server if it is running, then execute:
+The repository includes a demonstration seed script. To populate the database with the project's demo accounts and data, run:
+
+```powershell
+python seed_demo.py
+```
+
+Use the demo credentials configured in that script. For a clean demonstration, follow the script's expected database setup and avoid running it against data you need to preserve.
+
+### 7. Run the tests
+
+Stop the development server if necessary, then run:
 
 ```powershell
 python -m pytest -q
 ```
 
-## Typical Workflow
+**Latest verified test result: 68 passed.**
 
-1. Register a student.
-2. Create a course.
-3. Enroll the student in the course.
-4. Create an academic record with attendance, assessment scores, and assignment counts.
-5. Open the generated academic report to review findings and supporting evidence.
-6. Use the What-If Simulator to compare a hypothetical scenario with the saved data.
+Run the suite again after making changes; the result above records the latest verification, not a guarantee about future code changes.
 
-## How the Evaluation Works
+## Testing and verification
 
-EduPulse currently uses transparent, rule-based evaluation rather than a trained machine-learning prediction model.
+The test suite covers academic evaluation, input validation, database operations, authentication-related workflows, attendance, assessments, marks, and application routes.
 
-The evaluation considers:
-- Attendance percentage.
-- Changes between assessment scores.
-- Assignment completion rate.
+Manual verification has also included starting the application, accessing the faculty analytics page, and confirming that a student account is denied access to faculty-only analytics.
 
-Findings include explanations and evidence so users can understand why an indicator was raised. Intervention suggestions are intended to support review and discussion, not to replace professional judgment.
+## Limitations and responsible use
 
-Thresholds are configurable within the evaluation logic and should be treated as demonstration settings unless validated for a specific educational context.
+EduPulse is a portfolio project and demonstration of academic record management and explainable rule-based analytics. It has not been validated as a production academic decision-making system.
 
-## Testing
+- The evaluation rules are indicators for review, not predictions of student outcomes.
+- The configured thresholds require context-specific validation before use in an educational institution.
+- Intervention suggestions should support, not replace, informed decisions by academic staff.
+- Real student records require appropriate authorization, privacy controls, retention policies, backups, and operational safeguards.
+- Production deployment requires a deliberate review of authentication, authorization, configuration, database handling, and other security requirements.
 
-The project includes automated tests for academic evaluation, input validation, database behavior, application routes, and integration workflows.
+Demonstrations should use synthetic data or data that is appropriately authorized for the intended purpose.
 
-**Latest recorded test result:** 53 tests passed.
+## Possible next steps
 
-Run the test suite locally to verify the current checkout.
+- Add controlled data export and reporting.
+- Improve database migration and backup workflows.
+- Add broader integration and security testing.
+- Evaluate academic indicators using appropriately governed data and clearly defined criteria.
+- Prepare a deployment configuration with production-grade monitoring and operational safeguards.
 
-## Limitations and Responsible Use
-
-- The current evaluation is rule-based; it does not establish that a student will fail or predict an individual's future academic outcome.
-- Thresholds are not presented as scientifically validated measures of student success.
-- Intervention suggestions are informational and should be reviewed by appropriate academic staff.
-- The application is a portfolio project and has not been established as production-ready.
-- Before deployment with real student information, additional security, access control, privacy, data-retention, backup, and operational safeguards are needed.
-- Use synthetic or appropriately authorized data for demonstrations.
-
-## Future Improvements
-
-- Add authentication and role-based access control.
-- Improve dashboard insights and academic trend visualizations.
-- Add data export and reporting capabilities.
-- Evaluate the rule-based approach against appropriately governed, representative data.
-- Consider machine learning only if there is a justified use case, suitable data, and a responsible evaluation process.
-- Deploy with production-appropriate configuration, monitoring, and security controls.
+Machine learning should be considered only if a justified use case and suitable evaluation data become available.
 
 ## Author
 
 **Rohan S**
 
 GitHub: [rohanronniie](https://github.com/rohanronniie)
+
+Repository: [EduPulse](https://github.com/rohanronniie/EduPulse)

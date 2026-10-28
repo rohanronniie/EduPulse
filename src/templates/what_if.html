@@ -18,6 +18,7 @@
     {% endif %}
 
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label for="attendance_percentage">Attendance (%)</label>
             <input id="attendance_percentage" name="attendance_percentage"

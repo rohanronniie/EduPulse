@@ -29,7 +29,8 @@
     {% if students %}
     <form method="POST"
           action="{{ url_for('assessment.enter_marks', assessment_id=assessment.id) }}">
-        <div class="table-wrapper">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>

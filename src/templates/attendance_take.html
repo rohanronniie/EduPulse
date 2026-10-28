@@ -16,6 +16,7 @@
 </section>
 
 <form method="POST" class="card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-grid">
         <div class="form-group">
             <label for="session_date">Class date</label>

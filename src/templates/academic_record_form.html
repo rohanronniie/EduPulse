@@ -13,6 +13,7 @@
         <a href="{{ url_for('enrollment.create_enrollment') }}">Create enrollment</a>
     {% else %}
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="enrollment_id">Student and course</label>
                 <select name="enrollment_id" id="enrollment_id" required>

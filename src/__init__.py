@@ -1,6 +1,8 @@
+import os
 
 from flask import Flask, render_template
 from sqlalchemy import func, select
+from flask_wtf.csrf import CSRFProtect
 
 from src.course_routes import courses_bp
 from src.database import SessionLocal, initialize_database
@@ -20,20 +22,34 @@ from src.portal_models import (
 from src.auth_routes import auth_bp, login_required, get_current_user
 from src.attendance_routes import attendance_bp
 from src.assessment_routes import assessment_bp
-
+from src.analytics_routes import analytics_bp
+from src.academic_support_routes import academic_support_bp
 
 def create_app(test_config=None):
     """Create and configure the EduPulse Flask application."""
     app = Flask(__name__)
 
     app.config.from_mapping(
-        SECRET_KEY="dev-only-change-me",
+        SECRET_KEY=os.environ.get("EDUPULSE_SECRET_KEY"),
         INITIALIZE_DATABASE=True,
         SESSION_FACTORY=SessionLocal,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
     )
 
     if test_config is not None:
         app.config.update(test_config)
+
+    if not app.config.get("SECRET_KEY"):
+        if app.config.get("TESTING"):
+            app.config["SECRET_KEY"] = "test-only-secret-key"
+        else:
+            raise RuntimeError(
+                "EDUPULSE_SECRET_KEY must be set before starting EduPulse."
+            )
+
+    csrf = CSRFProtect()
+    csrf.init_app(app)
 
     if app.config["INITIALIZE_DATABASE"]:
         initialize_database()
@@ -45,7 +61,9 @@ def create_app(test_config=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(attendance_bp)
     app.register_blueprint(assessment_bp)
-    
+    app.register_blueprint(analytics_bp)
+    app.register_blueprint(academic_support_bp)
+
     @app.context_processor
     def inject_current_user():
         return {"current_user": get_current_user()}

@@ -21,6 +21,7 @@
 
     <form method="POST"
           action="{{ url_for('assessment.course_assessments', course_id=course.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-grid">
             <div class="form-group">
                 <label for="title">Assessment title</label>
@@ -93,6 +94,7 @@
                         <form method="POST"
                               action="{{ url_for('assessment.publish_results', assessment_id=assessment.id) }}"
                               class="inline-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="button button-secondary">
                                 Publish results
                             </button>

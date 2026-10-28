@@ -51,6 +51,10 @@
                             Assessments & Marks
                         </a>
 
+                        <a class="nav-link" href="{{ url_for('analytics.dashboard') }}">
+                            Analytics
+                        </a>
+
                         <p class="nav-label">Academic</p>
 
                         <a class="nav-link" href="{{ url_for('academic.list_records') }}">
@@ -81,6 +85,7 @@
                     <form action="{{ url_for('auth.logout') }}"
                           method="post"
                           class="logout-form">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="logout-button">
                             Logout
                         </button>
@@ -118,5 +123,6 @@
             </section>
         </main>
     </div>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
