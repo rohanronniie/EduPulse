@@ -3,6 +3,10 @@
 
 [![Tests](https://github.com/rohanronniie/EduPulse/actions/workflows/tests.yml/badge.svg)](https://github.com/rohanronniie/EduPulse/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.1-000000?logo=flask&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?logo=sqlalchemy&logoColor=white)
 
 EduPulse is a web application for managing student academic records and identifying areas where additional academic support may be needed. It brings attendance, assessment results, and assignment completion into one place, with explanations that show how each academic indicator was generated.
 
@@ -15,6 +19,10 @@ The project focuses on three practical engineering concerns: **explainable evalu
 ## Screenshots
 
 These screenshots are from the running application populated with the included synthetic demo cohort. They show real faculty dashboards, course analytics, and a student's dated subject record.
+
+### Sign in
+
+![EduPulse sign-in page](docs/images/sign-in.svg)
 
 | Faculty dashboard | Academic analytics | Student subject detail |
 |---|---|---|

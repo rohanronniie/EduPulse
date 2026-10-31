@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1897" height="1030" viewBox="0 0 1897 1030" role="img" aria-labelledby="title description">
+  <title id="title">EduPulse sign-in page</title>
+  <desc id="description">EduPulse sign-in page with academic intelligence messaging, username and password fields, and a demo account selector.</desc>
+  <defs>
+    <linearGradient id="sidebar" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111e37"/><stop offset=".68" stop-color="#182e4d"/><stop offset="1" stop-color="#155b5d"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f4fbfa"/><stop offset="1" stop-color="#f5f8fc"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#0da99e" stop-opacity=".25"/><stop offset="1" stop-color="#0da99e" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-.2" y="-.2" width="1.4" height="1.5"><feGaussianBlur in="SourceAlpha" stdDeviation="22"/><feOffset dy="16"/><feComponentTransfer><feFuncA type="linear" slope=".12"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>
+      text{font-family:Arial,Helvetica,sans-serif;fill:#10203d}.muted{fill:#617594}.white{fill:#fff}.teal{fill:#16b7a7}.small{font-size:14px}.label{font-size:15px;font-weight:700}.field{fill:#fff;stroke:#d4deeb;stroke-width:1}.button{fill:#14b6a5}.tiny{font-size:11px;font-weight:700;letter-spacing:1.7px}
+    </style>
+  </defs>
+  <rect width="1897" height="1030" fill="#f3f6fb"/>
+  <path fill="url(#sidebar)" d="M0 0h763v1030H0z"/>
+  <ellipse cx="598" cy="936" rx="390" ry="360" fill="url(#glow)"/>
+  <circle cx="557" cy="982" r="258" fill="none" stroke="#fff" stroke-opacity=".06"/>
+  <circle cx="557" cy="982" r="308" fill="none" stroke="#fff" stroke-opacity=".035"/>
+  <rect x="90" y="49" width="53" height="52" rx="14" fill="#16b7a7"/>
+  <text x="110" y="85" font-size="27" font-weight="800">E</text>
+  <text x="158" y="84" class="white" font-size="28" font-weight="700">EduPulse</text>
+  <text x="278" y="87" fill="#c3d2e7" font-size="13">Academic Portal</text>
+  <path d="M90 136h583" stroke="#ffffff" stroke-opacity=".12"/>
+  <text x="90" y="308" class="teal tiny" font-size="14" letter-spacing="2">ACADEMIC INTELLIGENCE</text>
+  <text x="90" y="391" class="white" font-size="63" font-weight="750" letter-spacing="-2">See the full picture.</text>
+  <text x="90" y="464" fill="#66e0d2" font-size="63" font-weight="750" letter-spacing="-2">Support every</text>
+  <text x="90" y="536" fill="#66e0d2" font-size="63" font-weight="750" letter-spacing="-2">learner.</text>
+  <text x="90" y="599" fill="#d0d9e8" font-size="20">Attendance, assessment progress, and practical academic</text>
+  <text x="90" y="630" fill="#d0d9e8" font-size="20">support in one clear workspace.</text>
+  <g font-size="14" font-weight="700"><text x="90" y="711" class="teal">01</text><text x="126" y="711" class="white">Understand progress</text><text x="90" y="756" class="teal">02</text><text x="126" y="756" class="white">Spot where help matters</text><text x="90" y="801" class="teal">03</text><text x="126" y="801" class="white">Follow through with care</text></g>
+  <rect x="976" y="66" width="711" height="902" rx="24" fill="#fff" stroke="#e0e7f0" filter="url(#shadow)"/>
+  <text x="1029" y="134" class="teal tiny" font-size="13" letter-spacing="1.4">WELCOME BACK</text>
+  <text x="1029" y="196" font-size="43" font-weight="750" letter-spacing="-1.2">Sign in to EduPulse</text>
+  <text x="1029" y="239" class="muted" font-size="18">Continue to your student or faculty workspace.</text>
+  <text x="1029" y="307" class="label">Username</text>
+  <rect x="1029" y="324" width="606" height="57" rx="11" class="field"/>
+  <text x="1045" y="361" class="muted" font-size="17">Enter your username</text>
+  <text x="1029" y="419" class="label">Password</text>
+  <rect x="1029" y="436" width="606" height="58" rx="11" class="field"/>
+  <text x="1045" y="473" class="muted" font-size="17">Enter your password</text>
+  <text x="1572" y="472" class="teal" font-size="14" font-weight="700">Show</text>
+  <rect x="1029" y="518" width="606" height="53" rx="11" class="button"/>
+  <text x="1305" y="551" font-size="15" font-weight="700">Sign in</text>
+  <rect x="1029" y="605" width="606" height="311" rx="16" fill="url(#panel)" stroke="#d7ece8"/>
+  <text x="1054" y="643" class="teal tiny">TRY THE DEMO</text>
+  <text x="1054" y="676" font-size="20" font-weight="700">Explore a workspace</text>
+  <rect x="1507" y="629" width="103" height="29" rx="15" fill="#def6f1"/>
+  <text x="1520" y="648" fill="#148a80" font-size="10" font-weight="700" letter-spacing=".4">SAMPLE DATA</text>
+  <text x="1054" y="725" class="label">Choose a faculty or student account</text>
+  <rect x="1054" y="738" width="302" height="53" rx="11" class="field"/>
+  <text x="1072" y="771" font-size="14">Select a demo account</text>
+  <path d="m1338 759 8 8 8-8" fill="none" stroke="#17253e" stroke-width="2"/>
+  <rect x="1366" y="738" width="244" height="53" rx="11" fill="#fff" stroke="#d4deeb"/>
+  <text x="1385" y="771" font-size="14" font-weight="700">Sign in to selected account</text>
+  <text x="1054" y="819" class="muted" font-size="13">Shared demo password:</text>
+  <rect x="1204" y="803" width="76" height="22" rx="5" fill="#fff" stroke="#dce5ef"/>
+  <text x="1210" y="819" font-size="12" font-weight="700">Demo123!</text>
+  <path d="M1054 837h556" stroke="#dae3ec"/>
+  <text x="1054" y="866" class="muted" font-size="13">Demo accounts use fictional records. Do not use these credentials for a public or</text>
+  <text x="1054" y="886" class="muted" font-size="13">institutional deployment.</text>
+</svg>
