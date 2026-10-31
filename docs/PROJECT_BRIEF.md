@@ -38,12 +38,12 @@ The what-if simulator will show how changing hypothetical inputs affects a rule-
 
 - Python
 - Flask
-- SQLite for local development
+- SQLite for local development and PostgreSQL for a persistent deployment database
 - HTML, CSS, and JavaScript
 - pytest for automated testing
 - Git and GitHub for version control
 
-PostgreSQL, deployment tooling, and machine learning will be considered in later phases when the application is ready.
+Deployment tooling is included as a starting point. Machine learning remains out of scope unless a justified use case and responsibly governed data become available.
 
 ## 7. Quality Requirements
 
@@ -60,12 +60,12 @@ The project will be evaluated on functional correctness, test coverage, usabilit
 
 If a predictive model is introduced, it will be evaluated separately using suitable metrics and data that avoid leakage. Performance will be compared with a baseline before any claims are made.
 
-## 9. Initial Scope
+## 9. Current Scope
 
-The first milestone is a working local prototype with student records, validated academic data, and basic calculations.
+The application now includes role-based faculty/student portals, course and enrollment management, attendance and assessment entry, published results, explainable academic indicators, a what-if simulator, faculty analytics, and support follow-up tracking.
 
-Advanced analytics, intervention tracking, the what-if simulator, authentication, and deployment will be added incrementally.
+Local development uses SQLite. A PostgreSQL connection option, production WSGI entry point, container recipe, health check, and production cookie/security settings are prepared for a deployment chosen by the project owner.
 
 ## 10. Current Status
 
-Day 1 — Requirements and local repository setup.
+The product is a portfolio-stage academic support system. Its rules are transparent indicators for human review, and its demo cohort is synthetic. A migration and backup/restore process, hosting-specific setup, and institution-specific privacy/security review are still required before real student records are used.

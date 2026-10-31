@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} | EduPulse{% endblock %}
+{% block topbar_title %}Subject Overview{% endblock %}
+
+{% block content %}
+<section class="subject-detail-header">
+    <div>
+        <a class="subject-back-link" href="{{ url_for('home') }}">← Back to dashboard</a>
+        <p class="eyebrow">{{ course.course_code }} · SUBJECT DETAILS</p>
+        <h1>{{ course.title }}</h1>
+        <p>Attendance history and assessment results for {{ student_name }}.</p>
+    </div>
+    <span class="subject-detail-mark" aria-hidden="true">{{ course.course_code[:2] }}</span>
+</section>
+
+<section class="dashboard-grid subject-detail-metrics" aria-label="Subject summary">
+    <article class="card">
+        <p class="stat-label">Attendance rate</p>
+        <h2>{% if attendance_percentage is not none %}{{ attendance_percentage }}%{% else %}—{% endif %}</h2>
+        <p>{{ attended_count }} present or late out of {{ attendance_records|length }} sessions</p>
+    </article>
+    <article class="card">
+        <p class="stat-label">Published assessments</p>
+        <h2>{{ assessment_records|length }}</h2>
+        <p>Results released by your instructor</p>
+    </article>
+    <article class="card">
+        <p class="stat-label">Average score</p>
+        <h2>{% if average_assessment is not none %}{{ average_assessment }}%{% else %}—{% endif %}</h2>
+        <p>Across published assessments</p>
+    </article>
+</section>
+
+<section class="card subject-results-panel">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">ASSESSMENT RECORD</p>
+            <h2>Published results</h2>
+        </div>
+        <span>{{ assessment_records|length }} result(s)</span>
+    </div>
+    {% if assessment_records %}
+    <div class="subject-score-list">
+        {% for record in assessment_records %}
+            {% set percentage = (record.marks / record.max_marks * 100)|round(1) %}
+            <article class="subject-score-item">
+                <div class="subject-score-heading">
+                    <div>
+                        <h3>{{ record.title }}</h3>
+                        <p>{{ record.assessment_date.strftime('%d %b %Y') }}</p>
+                    </div>
+                    <strong>{{ record.marks }} <span>/ {{ record.max_marks }}</span></strong>
+                </div>
+                <div class="metric-bar-track" role="progressbar"
+                     aria-label="{{ record.title }} score"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="{{ percentage }}">
+                    <span class="metric-bar-fill metric-bar-score" style="width: {{ percentage }}%"></span>
+                </div>
+                <small>{{ percentage }}% of available marks</small>
+            </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state compact-empty-state">
+        <h3>No results released</h3>
+        <p>Published assessment marks for this subject will appear here.</p>
+    </div>
+    {% endif %}
+</section>
+
+<section class="card subject-attendance-panel">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">CLASS HISTORY</p>
+            <h2>Attendance by date</h2>
+        </div>
+        <span>{{ attendance_records|length }} session(s)</span>
+    </div>
+    {% if attendance_records %}
+    <div class="table-wrapper">
+        <table class="subject-attendance-table">
+            <thead>
+                <tr><th>Date</th><th>Class topic</th><th>Your status</th></tr>
+            </thead>
+            <tbody>
+                {% for record in attendance_records %}
+                <tr>
+                    <td>{{ record.session_date.strftime('%d %b %Y') }}</td>
+                    <td>{{ record.topic or 'Class session' }}</td>
+                    <td><span class="attendance-status attendance-status-{{ record.status }}">{{ record.status|replace('_', ' ')|title }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state compact-empty-state">
+        <h3>No attendance recorded</h3>
+        <p>Attendance entries for this subject will appear here after class is recorded.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

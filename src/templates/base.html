@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="app-layout">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div class="app-layout{% if not current_user %} auth-layout{% endif %}">
         <aside class="sidebar">
             <a href="{{ url_for('home') }}" class="brand">
                 <span class="brand-mark">E</span>
@@ -23,50 +24,46 @@
                     {{ 'Student Portal' if current_user.role == 'student' else 'Faculty Workspace' }}
                 </p>
 
-                <nav class="sidebar-nav">
-                    <a class="nav-link" href="{{ url_for('home') }}">
+                <nav class="sidebar-nav" aria-label="Primary navigation">
+                    <a class="nav-link{% if request.endpoint == 'home' %} active{% endif %}" href="{{ url_for('home') }}">
                         Dashboard
                     </a>
 
                     {% if current_user.role == 'faculty' %}
                         <p class="nav-label">Management</p>
 
-                        <a class="nav-link" href="{{ url_for('students.list_students') }}">
+                        <a class="nav-link{% if request.endpoint and request.endpoint.startswith('students.') %} active{% endif %}" href="{{ url_for('students.list_students') }}">
                             Students
                         </a>
 
-                        <a class="nav-link" href="{{ url_for('courses.list_courses') }}">
+                        <a class="nav-link{% if request.endpoint and request.endpoint.startswith('courses.') %} active{% endif %}" href="{{ url_for('courses.list_courses') }}">
                             Courses
                         </a>
 
-                        <a class="nav-link" href="{{ url_for('enrollment.list_enrollments') }}">
+                        <a class="nav-link{% if request.endpoint and request.endpoint.startswith('enrollment.') %} active{% endif %}" href="{{ url_for('enrollment.list_enrollments') }}">
                             Enrollments
                         </a>
 
-                        <a class="nav-link" href="{{ url_for('attendance.list_courses') }}">
+                        <a class="nav-link{% if request.endpoint and request.endpoint.startswith('attendance.') %} active{% endif %}" href="{{ url_for('attendance.list_courses') }}">
                             Attendance
                         </a>
 
-                        <a class="nav-link" href="{{ url_for('assessment.list_courses') }}">
+                        <a class="nav-link{% if request.endpoint and request.endpoint.startswith('assessment.') %} active{% endif %}" href="{{ url_for('assessment.list_courses') }}">
                             Assessments & Marks
                         </a>
 
-                        <a class="nav-link" href="{{ url_for('analytics.dashboard') }}">
+                        <a class="nav-link{% if request.endpoint and request.endpoint.startswith('analytics.') %} active{% endif %}" href="{{ url_for('analytics.dashboard') }}">
                             Analytics
                         </a>
 
                         <p class="nav-label">Academic</p>
 
-                        <a class="nav-link" href="{{ url_for('academic.list_records') }}">
+                        <a class="nav-link{% if request.endpoint and request.endpoint.startswith('academic.') %} active{% endif %}" href="{{ url_for('academic.list_records') }}">
                             Academic Records
                         </a>
 
-                        <a class="nav-link" href="{{ url_for('students.create_student') }}">
-                            Add Student
-                        </a>
-
-                        <a class="nav-link" href="{{ url_for('courses.create_course') }}">
-                            Add Course
+                        <a class="nav-link{% if request.endpoint and request.endpoint.startswith('academic_support.') %} active{% endif %}" href="{{ url_for('academic_support.index') }}">
+                            Academic Support
                         </a>
 
                         <a class="nav-link" href="{{ url_for('enrollment.create_enrollment') }}">
@@ -91,11 +88,22 @@
                         </button>
                     </form>
                 </div>
+            {% else %}
+                <div class="auth-sidebar-message">
+                    <p class="eyebrow">ACADEMIC INTELLIGENCE</p>
+                    <h1>See the full picture.<br><span>Support every learner.</span></h1>
+                    <p>Attendance, assessment progress, and practical academic support in one clear workspace.</p>
+                    <div class="auth-proof-points" aria-label="EduPulse capabilities">
+                        <span>01 <b>Understand progress</b></span>
+                        <span>02 <b>Spot where help matters</b></span>
+                        <span>03 <b>Follow through with care</b></span>
+                    </div>
+                </div>
             {% endif %}
         </aside>
 
-        <main class="main-area">
-            <header class="topbar">
+        <main class="main-area{% if not current_user %} auth-main-area{% endif %}" id="main-content">
+            {% if current_user %}<header class="topbar">
                 <div>
                     <h2 class="topbar-title">
                         {% block topbar_title %}Dashboard{% endblock %}
@@ -104,7 +112,7 @@
                         Student Performance &amp; Academic Analytics
                     </p>
                 </div>
-            </header>
+            </header>{% endif %}
 
             <section class="page-content">
                 {% with messages = get_flashed_messages(with_categories=true) %}

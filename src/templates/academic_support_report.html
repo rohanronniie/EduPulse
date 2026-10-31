@@ -5,23 +5,57 @@
 
 {% block content %}
 <section class="page-header">
-    <h1>Academic Support Report</h1>
-    <p>{{ course.title }} ({{ course.course_code }})</p>
-    <a href="{{ url_for('academic_support.index') }}">
+    <div>
+        <p class="eyebrow">{{ course.course_code }} · STUDENT SUCCESS</p>
+        <h1>Support workspace</h1>
+        <p>{{ course.title }} · Review signals and record timely follow-up.</p>
+        <p class="report-disclaimer">
+            Attendance and published assessment results are live portal data.
+            Assignment completion comes from saved academic records; if none
+            exists, the existing 0 of 0 fallback is used.
+        </p>
+    </div>
+    <a class="button button-secondary" href="{{ url_for('academic_support.index') }}">
         Back to courses
     </a>
 </section>
 
 {% if reports %}
+    <section class="support-summary" aria-label="Course support summary">
+        <article class="support-summary-item">
+            <span>Students reviewed</span>
+            <strong>{{ summary.students }}</strong>
+        </article>
+        <article class="support-summary-item">
+            <span>Support recommended</span>
+            <strong>{{ summary.support_recommended }}</strong>
+        </article>
+        <article class="support-summary-item">
+            <span>Follow-ups in progress</span>
+            <strong>{{ summary.open_follow_ups }}</strong>
+        </article>
+    </section>
+
     {% for item in reports %}
         <section class="card academic-report-card">
-            <h2>{{ item.student.full_name }}</h2>
-            <p>Student ID: {{ item.student.student_code }}</p>
+            <div class="student-report-heading">
+                <div>
+                    <p class="student-code">{{ item.student.student_code }}</p>
+                    <h2>{{ item.student.full_name }}</h2>
+                </div>
+                <span class="status-pill status-{{ item.report.overall_status }}">
+                    {{ item.report.overall_status | replace('_', ' ') | title }}
+                </span>
+            </div>
 
-            <p>
-                <strong>Overall status:</strong>
-                {{ item.report.overall_status | replace('_', ' ') | title }}
-            </p>
+            <div class="data-sources" aria-label="Data used for this student">
+                <h3>Data used</h3>
+                <ul>
+                    <li>Attendance: live records for this course</li>
+                    <li>Assessments: published portal results ({{ item.assessment_count }})</li>
+                    <li>Assignments: saved academic record{% if not item.assignment_data_available %} not available; current 0 of 0 fallback applies{% endif %}</li>
+                </ul>
+            </div>
 
             <h3>Evidence and findings</h3>
 
@@ -29,7 +63,9 @@
                 <div class="finding">
                     <h4>
                         {{ rule_name | replace('_', ' ') | title }}
-                        — {{ finding.status | replace('_', ' ') | title }}
+                        <span class="finding-status finding-{{ finding.status }}">
+                            {{ finding.status | replace('_', ' ') | title }}
+                        </span>
                     </h4>
 
                     <p>{{ finding.reason }}</p>
@@ -41,7 +77,7 @@
             {% if item.interventions.recommendations %}
                 <ul>
                     {% for recommendation in item.interventions.recommendations %}
-                        <li>{{ recommendation }}</li>
+                        <li>{{ recommendation.action }}</li>
                     {% endfor %}
                 </ul>
             {% else %}
@@ -57,6 +93,59 @@
                 </ul>
             {% endif %}
 
+            {% if item.interventions.recommendations %}
+                <div class="follow-up-area">
+                    <h3>Record a support follow-up</h3>
+                    <p>Turn a suggested action into a trackable next step.</p>
+                    <div class="follow-up-form-grid">
+                        {% for recommendation in item.interventions.recommendations %}
+                            <form
+                                class="follow-up-form"
+                                method="post"
+                                action="{{ url_for('academic_support.create_follow_up', course_id=course.id) }}"
+                            >
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="enrollment_id" value="{{ item.enrollment_id }}">
+                                <input type="hidden" name="finding_rule" value="{{ recommendation.rule }}">
+                                <input type="hidden" name="action_text" value="{{ recommendation.action }}">
+                                <p>{{ recommendation.action }}</p>
+                                <label for="due-{{ item.student.id }}-{{ loop.index }}">Follow-up by (optional)</label>
+                                <input id="due-{{ item.student.id }}-{{ loop.index }}" type="date" name="due_date">
+                                <label for="notes-{{ item.student.id }}-{{ loop.index }}">Private staff notes (optional)</label>
+                                <textarea id="notes-{{ item.student.id }}-{{ loop.index }}" name="notes" rows="2" maxlength="2000" placeholder="Add a brief note for the faculty team"></textarea>
+                                <button class="btn btn-primary" type="submit">Add follow-up</button>
+                            </form>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if item.follow_ups %}
+                <div class="follow-up-list">
+                    <h3>Follow-up history</h3>
+                    {% for follow_up in item.follow_ups %}
+                        <article class="follow-up-record">
+                            <div>
+                                <p class="follow-up-rule">{{ follow_up.finding_rule | replace('_', ' ') | title }}</p>
+                                <strong>{{ follow_up.action_text }}</strong>
+                                {% if follow_up.notes %}<p>{{ follow_up.notes }}</p>{% endif %}
+                                {% if follow_up.due_date %}<p class="form-help">Due {{ follow_up.due_date.strftime('%d %b %Y') }}</p>{% endif %}
+                            </div>
+                            <form method="post" action="{{ url_for('academic_support.update_follow_up_status', follow_up_id=follow_up.id) }}" class="follow-up-status-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <label class="sr-only" for="status-{{ follow_up.id }}">Follow-up status</label>
+                                <select id="status-{{ follow_up.id }}" name="status">
+                                    <option value="open" {% if follow_up.status == 'open' %}selected{% endif %}>Open</option>
+                                    <option value="in_progress" {% if follow_up.status == 'in_progress' %}selected{% endif %}>In progress</option>
+                                    <option value="completed" {% if follow_up.status == 'completed' %}selected{% endif %}>Completed</option>
+                                </select>
+                                <button class="btn btn-secondary" type="submit">Update</button>
+                            </form>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
             {% if item.attendance_percentage is none %}
                 <p>Attendance: No recorded attendance data.</p>
             {% else %}
@@ -67,16 +156,6 @@
                 </p>
             {% endif %}
 
-            <p>
-                Published assessment results available:
-                {{ item.assessment_count }}
-            </p>
-
-            {% if not item.assignment_data_available %}
-                <p>
-                    Assignment completion has no academic record yet.
-                </p>
-            {% endif %}
         </section>
     {% endfor %}
 {% else %}

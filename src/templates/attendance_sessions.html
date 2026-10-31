@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Sessions | EduPulse{% endblock %}
+{% block topbar_title %}Attendance Management{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <p class="eyebrow">{{ course.course_code }}</p>
+        <h1>Attendance Sessions</h1>
+        <p>{{ course.title }} · {{ sessions|length }} recorded session(s)</p>
+    </div>
+    <div class="page-actions">
+        <a class="button button-secondary" href="{{ url_for('attendance.list_courses') }}">All courses</a>
+        <a class="button" href="{{ url_for('attendance.take_attendance', course_id=course.id) }}">Record a session</a>
+    </div>
+</section>
+
+<section class="card attendance-sessions-card">
+    {% if sessions %}
+        <div class="table-wrapper">
+            <table class="data-table attendance-sessions-table">
+                <thead>
+                    <tr>
+                        <th>Class date</th>
+                        <th>Topic</th>
+                        <th>Students recorded</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in sessions %}
+                    <tr>
+                        <td>{{ item.session_date.strftime('%d %b %Y') }}</td>
+                        <td>{{ item.topic or 'Class session' }}</td>
+                        <td>{{ entry_counts.get(item.id, 0) }}</td>
+                        <td>
+                            <a class="table-action-link" href="{{ url_for('attendance.take_attendance', course_id=course.id, session_id=item.id) }}">Edit attendance &rarr;</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2>No attendance sessions yet</h2>
+            <p>Once a session is recorded, you can return here to review or correct it.</p>
+            <a class="button" href="{{ url_for('attendance.take_attendance', course_id=course.id) }}">Record first session</a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

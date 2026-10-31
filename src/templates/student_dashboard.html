@@ -34,61 +34,130 @@
     </article>
 </section>
 
-<section class="card">
-    <h2>My Subjects</h2>
-
-    {% if courses %}
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Course Code</th>
-                        <th>Subject</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for course in courses %}
-                    <tr>
-                        <td>{{ course.course_code }}</td>
-                        <td>{{ course.title }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<section class="dashboard-chart-grid" aria-label="Your academic progress charts">
+    <article class="card dashboard-chart-card">
+        <div class="chart-heading">
+            <div>
+                <p class="eyebrow">CLASS PARTICIPATION</p>
+                <h2>Attendance by subject</h2>
+            </div>
+            <span class="chart-unit">Present + late</span>
         </div>
-    {% else %}
-        <p>No subjects have been assigned to your account yet.</p>
-    {% endif %}
+        {% set attendance_available = namespace(value=false) %}
+        {% for item in student_course_analytics %}
+            {% if item.attendance_percentage is not none %}{% set attendance_available.value = true %}{% endif %}
+        {% endfor %}
+        {% if attendance_available.value %}
+        <div class="metric-bar-list">
+            {% for item in student_course_analytics %}
+                {% if item.attendance_percentage is not none %}
+                <div class="metric-bar-item">
+                    <div class="metric-bar-heading">
+                        <span>{{ item.course.title }}</span>
+                        <strong>{{ item.attendance_percentage }}%</strong>
+                    </div>
+                    <div class="metric-bar-track" role="progressbar"
+                         aria-label="{{ item.course.title }} attendance"
+                         aria-valuemin="0" aria-valuemax="100"
+                         aria-valuenow="{{ item.attendance_percentage }}">
+                        <span class="metric-bar-fill metric-bar-attendance"
+                              style="width: {{ item.attendance_percentage }}%"></span>
+                    </div>
+                    <small>{{ item.attendance_total }} recorded class entries</small>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="chart-empty-state">Attendance charts will appear after your instructors record class sessions.</p>
+        {% endif %}
+    </article>
+
+    <article class="card dashboard-chart-card">
+        <div class="chart-heading">
+            <div>
+                <p class="eyebrow">PUBLISHED RESULTS</p>
+                <h2>Assessment scores</h2>
+            </div>
+            <span class="chart-unit">Score · %</span>
+        </div>
+        {% if published_marks %}
+        <div class="metric-bar-list">
+            {% for mark in student_course_analytics %}
+                {% for score in mark.assessment_marks %}
+                <div class="metric-bar-item">
+                    <div class="metric-bar-heading">
+                        <span>{{ score.course_title }} · {{ score.title }}</span>
+                        <strong>{{ score.percentage }}%</strong>
+                    </div>
+                    <div class="metric-bar-track" role="progressbar"
+                         aria-label="{{ score.course_title }} {{ score.title }} score"
+                         aria-valuemin="0" aria-valuemax="100"
+                         aria-valuenow="{{ score.percentage }}">
+                        <span class="metric-bar-fill metric-bar-score"
+                              style="width: {{ score.percentage }}%"></span>
+                    </div>
+                    <small>{{ score.marks }} / {{ score.max_marks }} marks</small>
+                </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="chart-empty-state">Published assessment scores will appear here when your instructors release results.</p>
+        {% endif %}
+    </article>
 </section>
 
-<section class="card">
-    <h2>Published Results</h2>
-
-    {% if published_marks %}
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Assessment</th>
-                        <th>Subject</th>
-                        <th>Marks</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for mark in published_marks %}
-                    <tr>
-                        <td>{{ mark.title }}</td>
-                        <td>{{ mark.course_title }}</td>
-                        <td>{{ mark.marks }} / {{ mark.max_marks }}</td>
-                        <td>{{ mark.assessment_date.strftime('%d %b %Y') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<section class="student-subject-section">
+    <div class="section-heading student-subject-heading">
+        <div>
+            <p class="eyebrow">YOUR COURSEWORK</p>
+            <h2>Subjects</h2>
+            <p>Open a subject to see dated attendance and published assessment results.</p>
         </div>
+        <span>{{ student_course_analytics|length }} enrolled</span>
+    </div>
+
+    {% if student_course_analytics %}
+    <div class="student-course-grid">
+        {% for item in student_course_analytics %}
+        <a class="student-course-card"
+           href="{{ url_for('student_course_detail', course_id=item.course.id) }}">
+            <div class="student-course-card-topline">
+                <span class="course-code-pill">{{ item.course.course_code }}</span>
+                <span class="student-course-arrow" aria-hidden="true">↗</span>
+            </div>
+            <h3>{{ item.course.title }}</h3>
+            <div class="student-course-card-stats">
+                <span>
+                    <small>Attendance</small>
+                    <strong>{% if item.attendance_percentage is not none %}{{ item.attendance_percentage }}%{% else %}No sessions{% endif %}</strong>
+                </span>
+                <span>
+                    <small>Published results</small>
+                    <strong>{{ item.assessment_marks|length }}</strong>
+                </span>
+            </div>
+            {% if item.attendance_percentage is not none %}
+            <div class="student-course-mini-track" aria-hidden="true">
+                <span style="width: {{ item.attendance_percentage }}%"></span>
+            </div>
+            {% endif %}
+            {% if item.assessment_marks %}
+                {% set latest_mark = item.assessment_marks[0] %}
+                <p class="student-course-latest">Latest result <strong>{{ latest_mark.marks }} / {{ latest_mark.max_marks }}</strong></p>
+            {% else %}
+                <p class="student-course-latest">No results released yet</p>
+            {% endif %}
+            <span class="student-course-action">View subject details <span aria-hidden="true">→</span></span>
+        </a>
+        {% endfor %}
+    </div>
     {% else %}
-        <p>No assessment results have been published yet.</p>
+    <div class="empty-state">
+        <h2>No subjects yet</h2>
+        <p>Subjects assigned to your account will appear here.</p>
+    </div>
     {% endif %}
 </section>
 {% endblock %}

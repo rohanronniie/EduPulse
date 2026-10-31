@@ -9,6 +9,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -101,6 +102,51 @@ class AttendanceEntry(Base):
         ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+
+
+class SupportFollowUp(Base):
+    """Record a faculty support action and its follow-through state."""
+
+    __tablename__ = "support_follow_ups"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('open', 'in_progress', 'completed')",
+            name="ck_support_follow_up_status",
+        ),
+        CheckConstraint(
+            "finding_rule IN ('attendance', 'assessment_trend', "
+            "'assignment_completion', 'general')",
+            name="ck_support_follow_up_rule",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_course_id: Mapped[int] = mapped_column(
+        ForeignKey("student_courses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    faculty_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    finding_rule: Mapped[str] = mapped_column(String(40), nullable=False)
+    action_text: Mapped[str] = mapped_column(String(300), nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="open", nullable=False
+    )
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
 
 class Assessment(Base):

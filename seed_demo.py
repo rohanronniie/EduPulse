@@ -1,203 +1,401 @@
+"""Load an idempotent, fictional cohort for local product demonstrations.
+
+This script is intended for a disposable or explicitly chosen demo database.
+It resets the documented demo account passwords and updates records with the
+EDU/DEMO codes below; it does not delete unrelated records.
+"""
 
 from datetime import date, timedelta
 
+from dotenv import load_dotenv
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
 
+load_dotenv()
+
+from src.academic_models import AcademicRecord
 from src.database import SessionLocal, initialize_database
+from src.demo_config import (
+    DEMO_PASSWORD,
+    FACULTY_USERNAME,
+    STUDENT_USERNAME,
+    student_demo_username,
+)
 from src.models import Course, Student, StudentCourse
 from src.portal_models import (
-    User,
-    FacultyCourse,
-    AttendanceSession,
-    AttendanceEntry,
     Assessment,
     AssessmentMark,
+    AttendanceEntry,
+    AttendanceSession,
+    FacultyCourse,
+    SupportFollowUp,
+    User,
 )
 
 
-STUDENT_USERNAME = "student.demo"
-STUDENT_PASSWORD = "EduPulseStudent@2026"
+STUDENT_PASSWORD = DEMO_PASSWORD
+FACULTY_PASSWORD = DEMO_PASSWORD
 
-FACULTY_USERNAME = "faculty.demo"
-FACULTY_PASSWORD = "EduPulseFaculty@2026"
+COURSES = [
+    ("DEMO101", "Foundations of Programming", "Programming lab"),
+    ("DATA201", "Data Analytics and Visualization", "Data studio"),
+    ("UXD120", "Human-Centered Design", "Design workshop"),
+    ("PMGT210", "Project Delivery Studio", "Project studio"),
+]
+
+# Fictional sample profiles. These names and records are synthetic and do not
+# represent real students or validated academic-risk classifications.
+STUDENTS = [
+    ("DEMO001", "Alex Morgan", [58, 52, 45], 4, 10),
+    ("DEMO002", "Jordan Lee", [61, 71, 80], 7, 10),
+    ("DEMO003", "Taylor Brooks", [78, 76, 81], 8, 10),
+    ("DEMO004", "Priya Nair", [88, 86, 91], 10, 10),
+    ("DEMO005", "Mateo Silva", [69, 60, 52], 5, 10),
+    ("DEMO006", "Amina Yusuf", [55, 66, 77], 7, 10),
+    ("DEMO007", "Noah Chen", [84, 80, 83], 9, 10),
+    ("DEMO008", "Leah Thompson", [72, 74, 78], 8, 10),
+]
+
+MISSED_WEEKS = {
+    0: {2, 4, 6, 8},
+    1: {3, 7},
+    2: {5},
+    3: set(),
+    4: {1, 3, 5, 7, 8},
+    5: {2, 6, 9},
+    6: {4},
+    7: {0, 8},
+}
+
+ASSESSMENTS = [
+    ("Knowledge Check 1", 9),
+    ("Midterm Application", 5),
+    ("Capstone Review", 1),
+]
+
+
+def _get_or_create_student(db, student_code, full_name):
+    student = db.scalar(
+        select(Student).where(Student.student_code == student_code)
+    )
+    if student is None:
+        student = Student(student_code=student_code, full_name=full_name)
+        db.add(student)
+        db.flush()
+    else:
+        student.full_name = full_name
+    return student
+
+
+def _get_or_create_course(db, course_code, title):
+    course = db.scalar(
+        select(Course).where(Course.course_code == course_code)
+    )
+    if course is None:
+        course = Course(course_code=course_code, title=title)
+        db.add(course)
+        db.flush()
+    else:
+        course.title = title
+    return course
 
 
 def seed_demo_data():
-    """Create repeatable synthetic data for local demonstrations."""
+    """Create sample accounts, cohort, attendance, marks, and follow-ups."""
     initialize_database()
 
     with SessionLocal() as db:
-        student = db.scalar(
-            select(Student).where(Student.student_code == "DEMO001")
-        )
-        if student is None:
-            student = Student(
-                student_code="DEMO001",
-                full_name="Alex Morgan",
-            )
-            db.add(student)
-            db.flush()
-
-        course = db.scalar(
-            select(Course).where(Course.course_code == "DEMO101")
-        )
-        if course is None:
-            course = Course(
-                course_code="DEMO101",
-                title="Introduction to Computing",
-            )
-            db.add(course)
-            db.flush()
-
-        enrollment = db.scalar(
-            select(StudentCourse).where(
-                StudentCourse.student_id == student.id,
-                StudentCourse.course_id == course.id,
-            )
-        )
-        if enrollment is None:
-            db.add(
-                StudentCourse(
-                    student_id=student.id,
-                    course_id=course.id,
-                )
-            )
-
-        student_user = db.scalar(
-            select(User).where(User.username == STUDENT_USERNAME)
-        )
-        if student_user is None:
-            student_user = User(
-                username=STUDENT_USERNAME,
-                password_hash=generate_password_hash(STUDENT_PASSWORD),
-                role="student",
-                student_id=student.id,
-            )
-            db.add(student_user)
-            db.flush()
-        else:
-            if student_user.role != "student" or student_user.student_id != student.id:
-                raise RuntimeError(
-                    "Existing student demo account has unexpected ownership."
-                )
-            student_user.password_hash = generate_password_hash(STUDENT_PASSWORD)
-
-        faculty_user = db.scalar(
+        faculty = db.scalar(
             select(User).where(User.username == FACULTY_USERNAME)
         )
-        if faculty_user is None:
-            faculty_user = User(
+        if faculty is None:
+            faculty = User(
                 username=FACULTY_USERNAME,
                 password_hash=generate_password_hash(FACULTY_PASSWORD),
                 role="faculty",
             )
-            db.add(faculty_user)
+            db.add(faculty)
             db.flush()
-        elif faculty_user.role != "faculty":
+        elif faculty.role != "faculty":
             raise RuntimeError(
-                "Existing faculty demo account has an unexpected role."
+                "The demo faculty username is already used by another role."
             )
         else:
-            faculty_user.password_hash = generate_password_hash(FACULTY_PASSWORD)
+            faculty.password_hash = generate_password_hash(FACULTY_PASSWORD)
 
-        assignment = db.scalar(
-            select(FacultyCourse).where(
-                FacultyCourse.faculty_id == faculty_user.id,
-                FacultyCourse.course_id == course.id,
+        students = [
+            _get_or_create_student(db, code, name)
+            for code, name, _, _, _ in STUDENTS
+        ]
+        courses = [
+            _get_or_create_course(db, code, title)
+            for code, title, _ in COURSES
+        ]
+
+        # Remove only the precise attendance rows generated by the first demo
+        # seed so the expanded cohort has one consistent ten-week sequence.
+        legacy_sessions = db.scalars(
+            select(AttendanceSession).where(
+                AttendanceSession.course_id == courses[0].id,
+                AttendanceSession.topic.in_(
+                    ["Demo lecture 1", "Demo lecture 2", "Demo lecture 3"]
+                ),
             )
-        )
-        if assignment is None:
-            db.add(
-                FacultyCourse(
-                    faculty_id=faculty_user.id,
-                    course_id=course.id,
-                )
+        ).all()
+        for legacy_session in legacy_sessions:
+            db.delete(legacy_session)
+
+        for student_index, student in enumerate(students):
+            student_username = student_demo_username(student_index)
+            student_user = db.scalar(
+                select(User).where(User.username == student_username)
             )
-
-        # Three synthetic class sessions make attendance calculations meaningful.
-        statuses = ["present", "present", "absent"]
-        for index, status in enumerate(statuses):
-            session_date = date.today() - timedelta(days=2 - index)
-            topic = f"Demo lecture {index + 1}"
-
-            attendance_session = db.scalar(
-                select(AttendanceSession).where(
-                    AttendanceSession.course_id == course.id,
-                    AttendanceSession.session_date == session_date,
-                    AttendanceSession.topic == topic,
+            if student_user is None:
+                # Rename the legacy student.demo account and any prior per-
+                # student demo account instead of leaving duplicate logins.
+                student_user = db.scalar(
+                    select(User).where(User.student_id == student.id)
                 )
-            )
-
-            if attendance_session is None:
-                attendance_session = AttendanceSession(
-                    course_id=course.id,
-                    faculty_id=faculty_user.id,
-                    session_date=session_date,
-                    topic=topic,
-                )
-                db.add(attendance_session)
-                db.flush()
-
-            entry = db.scalar(
-                select(AttendanceEntry).where(
-                    AttendanceEntry.session_id == attendance_session.id,
-                    AttendanceEntry.student_id == student.id,
-                )
-            )
-            if entry is None:
+            if student_user is None:
                 db.add(
-                    AttendanceEntry(
-                        session_id=attendance_session.id,
+                    User(
+                        username=student_username,
+                        password_hash=generate_password_hash(STUDENT_PASSWORD),
+                        role="student",
                         student_id=student.id,
-                        status=status,
                     )
                 )
             else:
-                entry.status = status
+                if (
+                    student_user.role != "student"
+                    or student_user.student_id != student.id
+                ):
+                    raise RuntimeError(
+                        f"Demo username {student_username} has unexpected ownership."
+                    )
+                student_user.username = student_username
+                student_user.password_hash = generate_password_hash(
+                    STUDENT_PASSWORD
+                )
 
-        assessment = db.scalar(
-            select(Assessment).where(
-                Assessment.course_id == course.id,
-                Assessment.title == "Demo Internal Assessment 1",
-            )
-        )
-        if assessment is None:
-            assessment = Assessment(
-                course_id=course.id,
-                faculty_id=faculty_user.id,
-                title="Demo Internal Assessment 1",
-                max_marks=25,
-                assessment_date=date.today(),
-                published=True,
-            )
-            db.add(assessment)
-            db.flush()
-
-        mark = db.scalar(
-            select(AssessmentMark).where(
-                AssessmentMark.assessment_id == assessment.id,
-                AssessmentMark.student_id == student.id,
-            )
-        )
-        if mark is None:
-            db.add(
-                AssessmentMark(
-                    assessment_id=assessment.id,
-                    student_id=student.id,
-                    marks=19,
+        enrollments = {}
+        for course_index, (course, (_, _, topic_prefix)) in enumerate(
+            zip(courses, COURSES)
+        ):
+            faculty_assignment = db.scalar(
+                select(FacultyCourse).where(
+                    FacultyCourse.faculty_id == faculty.id,
+                    FacultyCourse.course_id == course.id,
                 )
             )
-        else:
-            mark.marks = 19
+            if faculty_assignment is None:
+                db.add(
+                    FacultyCourse(
+                        faculty_id=faculty.id,
+                        course_id=course.id,
+                    )
+                )
+
+            for student_index, (student, profile) in enumerate(
+                zip(students, STUDENTS)
+            ):
+                _, _, score_profile, completed, total = profile
+                enrollment = db.scalar(
+                    select(StudentCourse).where(
+                        StudentCourse.student_id == student.id,
+                        StudentCourse.course_id == course.id,
+                    )
+                )
+                if enrollment is None:
+                    enrollment = StudentCourse(
+                        student_id=student.id,
+                        course_id=course.id,
+                    )
+                    db.add(enrollment)
+                    db.flush()
+                enrollments[(course_index, student_index)] = enrollment
+
+                for week_index in range(10):
+                    session_date = date.today() - timedelta(
+                        weeks=9 - week_index
+                    )
+                    topic = f"Week {week_index + 1}: {topic_prefix}"
+                    attendance_session = db.scalar(
+                        select(AttendanceSession).where(
+                            AttendanceSession.course_id == course.id,
+                            AttendanceSession.session_date == session_date,
+                            AttendanceSession.topic == topic,
+                        )
+                    )
+                    if attendance_session is None:
+                        attendance_session = AttendanceSession(
+                            course_id=course.id,
+                            faculty_id=faculty.id,
+                            session_date=session_date,
+                            topic=topic,
+                        )
+                        db.add(attendance_session)
+                        db.flush()
+
+                    attendance_status = (
+                        "absent"
+                        if week_index in MISSED_WEEKS[student_index]
+                        else "late"
+                        if week_index in {2, 7}
+                        else "present"
+                    )
+                    entry = db.scalar(
+                        select(AttendanceEntry).where(
+                            AttendanceEntry.session_id == attendance_session.id,
+                            AttendanceEntry.student_id == student.id,
+                        )
+                    )
+                    if entry is None:
+                        db.add(
+                            AttendanceEntry(
+                                session_id=attendance_session.id,
+                                student_id=student.id,
+                                status=attendance_status,
+                            )
+                        )
+                    else:
+                        entry.status = attendance_status
+
+                published_scores = []
+                for assessment_index, (title, weeks_ago) in enumerate(
+                    ASSESSMENTS
+                ):
+                    assessment = db.scalar(
+                        select(Assessment).where(
+                            Assessment.course_id == course.id,
+                            Assessment.title == title,
+                        )
+                    )
+                    if (
+                        assessment is None
+                        and course_index == 0
+                        and assessment_index == 0
+                    ):
+                        assessment = db.scalar(
+                            select(Assessment).where(
+                                Assessment.course_id == course.id,
+                                Assessment.title
+                                == "Demo Internal Assessment 1",
+                            )
+                        )
+                    assessment_date = date.today() - timedelta(
+                        weeks=weeks_ago
+                    )
+                    if assessment is None:
+                        assessment = Assessment(
+                            course_id=course.id,
+                            faculty_id=faculty.id,
+                            title=title,
+                            max_marks=100,
+                            assessment_date=assessment_date,
+                            published=True,
+                        )
+                        db.add(assessment)
+                        db.flush()
+                    else:
+                        assessment.faculty_id = faculty.id
+                        assessment.max_marks = 100
+                        assessment.assessment_date = assessment_date
+                        assessment.published = True
+
+                    course_adjustment = [0, 2, -2, 1][course_index]
+                    marks = max(
+                        0,
+                        min(
+                            100,
+                            score_profile[assessment_index]
+                            + course_adjustment,
+                        ),
+                    )
+                    mark = db.scalar(
+                        select(AssessmentMark).where(
+                            AssessmentMark.assessment_id == assessment.id,
+                            AssessmentMark.student_id == student.id,
+                        )
+                    )
+                    if mark is None:
+                        db.add(
+                            AssessmentMark(
+                                assessment_id=assessment.id,
+                                student_id=student.id,
+                                marks=marks,
+                            )
+                        )
+                    else:
+                        mark.marks = marks
+                    published_scores.append(marks)
+
+                academic_record = db.scalar(
+                    select(AcademicRecord).where(
+                        AcademicRecord.student_course_id == enrollment.id
+                    )
+                )
+                attendance_rate = (
+                    (10 - len(MISSED_WEEKS[student_index])) / 10 * 100
+                )
+                if academic_record is None:
+                    academic_record = AcademicRecord(
+                        student_course_id=enrollment.id,
+                        attendance_percentage=attendance_rate,
+                        assessment_scores=published_scores,
+                        completed_assignments=completed,
+                        total_assignments=total,
+                    )
+                    db.add(academic_record)
+                else:
+                    academic_record.attendance_percentage = attendance_rate
+                    academic_record.assessment_scores = published_scores
+                    academic_record.completed_assignments = completed
+                    academic_record.total_assignments = total
+
+                if student_index in {0, 4}:
+                    follow_up = db.scalar(
+                        select(SupportFollowUp)
+                        .where(
+                            SupportFollowUp.student_course_id == enrollment.id,
+                            SupportFollowUp.finding_rule == "attendance",
+                        )
+                        .order_by(SupportFollowUp.id)
+                    )
+                    if follow_up is None:
+                        db.add(
+                            SupportFollowUp(
+                                student_course_id=enrollment.id,
+                                faculty_id=faculty.id,
+                                finding_rule="attendance",
+                                action_text=(
+                                    "Hold a check-in to understand attendance barriers."
+                                ),
+                                notes="Synthetic sample follow-up for the demo cohort.",
+                                status=(
+                                    "in_progress"
+                                    if student_index == 0
+                                    else "open"
+                                ),
+                                due_date=date.today() + timedelta(days=7),
+                            )
+                        )
 
         db.commit()
 
-    print("Synthetic EduPulse demo data is ready.")
-    print(f"Student login: {STUDENT_USERNAME} / {STUDENT_PASSWORD}")
+    print("Fictional EduPulse demo data is ready.")
+    print("Cohort: 8 synthetic students | 4 courses | 10 attendance weeks")
+    print("Three published assessments per course and sample support follow-ups.")
+    print("Student demo logins (all use the same short demo password):")
+    for student_index, (_, full_name, *_profile) in enumerate(STUDENTS):
+        print(
+            f"  {full_name}: "
+            f"{student_demo_username(student_index)}"
+        )
+    print(f"Student password: {STUDENT_PASSWORD}")
     print(f"Faculty login: {FACULTY_USERNAME} / {FACULTY_PASSWORD}")
-    print("Use these accounts only in your local demo environment.")
+    print("Do not use these demo credentials in a deployed environment.")
 
 
 if __name__ == "__main__":

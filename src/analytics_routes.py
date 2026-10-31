@@ -104,6 +104,7 @@ def dashboard():
                     "course": course,
                     "student_count": student_count,
                     "total_attendance": total_attendance,
+                    "attended_count": attended_count,
                     "attendance_percentage": attendance_percentage,
                     "published_assessment_count": (
                         published_assessment_count
@@ -121,7 +122,86 @@ def dashboard():
                 }
             )
 
+        course_ids = [course.id for course in courses]
+        assessment_rows = db.execute(
+            select(
+                Assessment.course_id,
+                Assessment.assessment_date,
+                func.avg(
+                    (AssessmentMark.marks / Assessment.max_marks) * 100
+                ),
+            )
+            .join(
+                AssessmentMark,
+                AssessmentMark.assessment_id == Assessment.id,
+            )
+            .where(
+                Assessment.course_id.in_(course_ids),
+                Assessment.published.is_(True),
+            )
+            .group_by(Assessment.course_id, Assessment.assessment_date)
+            .order_by(Assessment.assessment_date)
+        ).all()
+
+        timeline_dates = sorted(
+            {assessment_date for _, assessment_date, _ in assessment_rows}
+        )
+        score_by_course_and_date = {
+            (course_id, assessment_date): round(average, 1)
+            for course_id, assessment_date, average in assessment_rows
+        }
+        palette = ["#0f9488", "#4f6bed", "#d97706", "#c2416c", "#64748b"]
+        assessment_timeline = {
+            "labels": [item.strftime("%b %d") for item in timeline_dates],
+            "series": [
+                {
+                    "label": course.title,
+                    "color": palette[index % len(palette)],
+                    "values": [
+                        score_by_course_and_date.get((course.id, date_value))
+                        for date_value in timeline_dates
+                    ],
+                }
+                for index, course in enumerate(courses)
+                if any(
+                    course.id == course_id
+                    for course_id, _, _ in assessment_rows
+                )
+            ],
+        }
+
+        attendance_entry_count = sum(
+            item["total_attendance"] for item in course_analytics
+        )
+        attended_entry_count = sum(
+            item["attended_count"] for item in course_analytics
+        )
+        mark_count = sum(item["mark_count"] for item in course_analytics)
+        weighted_score_total = sum(
+            item["average_percentage"] * item["mark_count"]
+            for item in course_analytics
+            if item["average_percentage"] is not None
+        )
+        analytics_summary = {
+            "courses": len(course_analytics),
+            "course_enrollments": sum(
+                item["student_count"] for item in course_analytics
+            ),
+            "attendance_percentage": (
+                round(attended_entry_count / attendance_entry_count * 100, 1)
+                if attendance_entry_count
+                else None
+            ),
+            "average_percentage": (
+                round(weighted_score_total / mark_count, 1)
+                if mark_count
+                else None
+            ),
+        }
+
         return render_template(
             "analytics_dashboard.html",
             course_analytics=course_analytics,
+            assessment_timeline=assessment_timeline,
+            analytics_summary=analytics_summary,
         )

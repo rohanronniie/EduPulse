@@ -8,7 +8,7 @@
     <div>
         <p class="eyebrow">FACULTY WORKSPACE</p>
         <h1>Attendance Management</h1>
-        <p>Select one of your assigned courses to record a class session.</p>
+        <p>Record a class or reopen an earlier session to correct attendance.</p>
     </div>
 </section>
 
@@ -25,7 +25,7 @@
                     <tr>
                         <th>Course code</th>
                         <th>Course name</th>
-                        <th>Action</th>
+                        <th>Attendance</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -34,12 +34,14 @@
                         <td>{{ course.course_code }}</td>
                         <td>{{ course.title }}</td>
                         <td>
-                            <a
-                                class="button"
-                                href="{{ url_for('attendance.take_attendance', course_id=course.id) }}"
-                            >
-                                Take attendance
-                            </a>
+                            <div class="table-actions">
+                                <a class="button" href="{{ url_for('attendance.take_attendance', course_id=course.id) }}">
+                                    Record session
+                                </a>
+                                <a class="button button-secondary" href="{{ url_for('attendance.list_sessions', course_id=course.id) }}">
+                                    View or edit sessions
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}

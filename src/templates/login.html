@@ -1,39 +1,114 @@
-
 {% extends "base.html" %}
 
 {% block title %}Sign In | EduPulse{% endblock %}
-{% block topbar_title %}Sign In{% endblock %}
 
 {% block content %}
-<section class="card" style="max-width: 460px; margin: 48px auto;">
-    <h1>Welcome to EduPulse</h1>
-    <p class="section-description">
-        Sign in to access your student or faculty portal.
-    </p>
+<section class="sign-in-layout" aria-labelledby="sign-in-title">
+    <div class="sign-in-card">
+        <p class="eyebrow sign-in-eyebrow">WELCOME BACK</p>
+        <h1 id="sign-in-title">Sign in to EduPulse</h1>
+        <p class="sign-in-description">Continue to your student or faculty workspace.</p>
 
-    <form method="post">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label for="username">Username</label>
-        <input
-            id="username"
-            name="username"
-            type="text"
-            autocomplete="username"
-            required
-        >
+        <form method="post" class="sign-in-form" id="loginForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="username">Username</label>
+            <input
+                id="username"
+                name="username"
+                type="text"
+                autocomplete="username"
+                value="{{ request.form.get('username', '') }}"
+                placeholder="Enter your username"
+                required
+            >
 
-        <label for="password">Password</label>
-        <input
-            id="password"
-            name="password"
-            type="password"
-            autocomplete="current-password"
-            required
-        >
+            <label for="password">Password</label>
+            <div class="password-field">
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Enter your password"
+                    required
+                >
+                <button
+                    class="password-toggle"
+                    type="button"
+                    id="togglePassword"
+                    aria-label="Show password"
+                    aria-pressed="false"
+                >Show</button>
+            </div>
 
-        <button class="btn btn-primary" type="submit">
-            Sign In
-        </button>
-    </form>
+            <button class="button sign-in-submit" type="submit">Sign in</button>
+        </form>
+
+        <div class="demo-access-panel">
+            <div class="demo-access-heading">
+                <div>
+                    <p class="eyebrow">TRY THE DEMO</p>
+                    <h2>Explore a workspace</h2>
+                </div>
+                <span class="demo-badge">SAMPLE DATA</span>
+            </div>
+
+            {% if demo_accounts %}
+                <label for="demoAccount">Choose a faculty or student account</label>
+                <div class="demo-account-controls">
+                    <select id="demoAccount">
+                        <option value="">Select a demo account</option>
+                        {% for account in demo_accounts %}
+                            <option value="{{ account.username }}">{{ account.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="button button-secondary" id="useDemoAccount">
+                        Sign in to selected account
+                    </button>
+                </div>
+                <p class="demo-password-note">
+                    Shared demo password: <code>{{ demo_password }}</code>
+                </p>
+                <p class="demo-picker-status" id="demoPickerStatus" role="status" aria-live="polite"></p>
+            {% else %}
+                <p class="demo-empty-state">
+                    Demo accounts are not in this database yet. From the project folder,
+                    run <code>python seed_demo.py</code> to add the sample students,
+                    courses, attendance, and assessments.
+                </p>
+            {% endif %}
+            <p class="demo-safety-note">Demo accounts use fictional records. Do not use these credentials for a public or institutional deployment.</p>
+        </div>
+    </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const passwordInput = document.getElementById("password");
+    const passwordToggle = document.getElementById("togglePassword");
+    passwordToggle.addEventListener("click", () => {
+        const isVisible = passwordInput.type === "text";
+        passwordInput.type = isVisible ? "password" : "text";
+        passwordToggle.textContent = isVisible ? "Show" : "Hide";
+        passwordToggle.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
+        passwordToggle.setAttribute("aria-pressed", String(!isVisible));
+    });
+
+    const demoAccount = document.getElementById("demoAccount");
+    const useDemoAccount = document.getElementById("useDemoAccount");
+    if (demoAccount && useDemoAccount) {
+        useDemoAccount.addEventListener("click", () => {
+            if (!demoAccount.value) {
+                document.getElementById("demoPickerStatus").textContent = "Choose an account first.";
+                demoAccount.focus();
+                return;
+            }
+            document.getElementById("username").value = demoAccount.value;
+            passwordInput.value = {{ demo_password|tojson }};
+            document.getElementById("demoPickerStatus").textContent = "Signing in…";
+            document.getElementById("loginForm").requestSubmit();
+        });
+    }
+</script>
 {% endblock %}

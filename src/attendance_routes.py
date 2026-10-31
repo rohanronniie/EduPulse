@@ -10,7 +10,7 @@ from flask import (
     request,
     url_for,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from src.auth_routes import get_current_user, role_required
 from src.models import Course, Student, StudentCourse
@@ -55,10 +55,54 @@ def list_courses():
         return render_template("attendance_courses.html", courses=courses)
 
 
+@attendance_bp.route("/course/<int:course_id>/sessions")
+@role_required("faculty")
+def list_sessions(course_id):
+    """List attendance sessions for an assigned course."""
+    user = get_current_user()
+    session_factory = current_app.config["SESSION_FACTORY"]
+
+    with session_factory() as db:
+        course = get_assigned_course(db, user["id"], course_id)
+        if course is None:
+            return "Course not found or not assigned to this faculty member.", 404
+
+        sessions = db.scalars(
+            select(AttendanceSession)
+            .where(AttendanceSession.course_id == course_id)
+            .order_by(
+                AttendanceSession.session_date.desc(),
+                AttendanceSession.id.desc(),
+            )
+        ).all()
+
+        entry_counts = dict(
+            db.execute(
+                select(
+                    AttendanceEntry.session_id,
+                    func.count(AttendanceEntry.id),
+                )
+                .join(
+                    AttendanceSession,
+                    AttendanceSession.id == AttendanceEntry.session_id,
+                )
+                .where(AttendanceSession.course_id == course_id)
+                .group_by(AttendanceEntry.session_id)
+            ).all()
+        )
+
+        return render_template(
+            "attendance_sessions.html",
+            course=course,
+            sessions=sessions,
+            entry_counts=entry_counts,
+        )
+
+
 @attendance_bp.route("/course/<int:course_id>", methods=["GET", "POST"])
 @role_required("faculty")
 def take_attendance(course_id):
-    """Record attendance for enrolled students in an assigned course."""
+    """Create or update attendance for an assigned course."""
     user = get_current_user()
     session_factory = current_app.config["SESSION_FACTORY"]
 
@@ -76,11 +120,39 @@ def take_attendance(course_id):
         ).all()
 
         if request.method == "GET":
+            attendance_session = None
+            status_by_student = {}
+            session_id = request.args.get("session_id", type=int)
+            if session_id is not None:
+                attendance_session = db.scalar(
+                    select(AttendanceSession).where(
+                        AttendanceSession.id == session_id,
+                        AttendanceSession.course_id == course_id,
+                    )
+                )
+                if attendance_session is None:
+                    return "Attendance session not found.", 404
+
+                status_by_student = {
+                    entry.student_id: entry.status
+                    for entry in db.scalars(
+                        select(AttendanceEntry).where(
+                            AttendanceEntry.session_id == attendance_session.id
+                        )
+                    ).all()
+                }
+
             return render_template(
                 "attendance_take.html",
                 course=course,
                 students=students,
-                today=date.today().isoformat(),
+                today=(
+                    attendance_session.session_date.isoformat()
+                    if attendance_session is not None
+                    else date.today().isoformat()
+                ),
+                attendance_session=attendance_session,
+                status_by_student=status_by_student,
             )
 
         if not students:
@@ -110,6 +182,44 @@ def take_attendance(course_id):
                 url_for("attendance.take_attendance", course_id=course_id)
             )
 
+        requested_session_id = request.form.get("session_id", type=int)
+        attendance_session = None
+        if requested_session_id is not None:
+            attendance_session = db.scalar(
+                select(AttendanceSession).where(
+                    AttendanceSession.id == requested_session_id,
+                    AttendanceSession.course_id == course_id,
+                )
+            )
+            if attendance_session is None:
+                return "Attendance session not found.", 404
+
+        duplicate_query = select(AttendanceSession.id).where(
+            AttendanceSession.course_id == course_id,
+            AttendanceSession.session_date == session_date,
+            AttendanceSession.topic == topic,
+        )
+        if attendance_session is not None:
+            duplicate_query = duplicate_query.where(
+                AttendanceSession.id != attendance_session.id
+            )
+        duplicate_session = db.scalar(duplicate_query)
+        if attendance_session is not None and duplicate_session is not None:
+            flash(
+                "Another attendance session already uses this course, date, and topic.",
+                "error",
+            )
+            return redirect(
+                url_for(
+                    "attendance.take_attendance",
+                    course_id=course_id,
+                    session_id=attendance_session.id,
+                )
+            )
+
+        if attendance_session is None and duplicate_session is not None:
+            attendance_session = db.get(AttendanceSession, duplicate_session)
+
         submitted_entries = []
         for student in students:
             status = request.form.get(
@@ -124,28 +234,52 @@ def take_attendance(course_id):
 
             submitted_entries.append((student.id, status))
 
-        attendance_session = AttendanceSession(
-            course_id=course_id,
-            faculty_id=user["id"],
-            session_date=session_date,
-            topic=topic,
-        )
-        db.add(attendance_session)
-        db.flush()
+        is_update = attendance_session is not None
+        if attendance_session is None:
+            attendance_session = AttendanceSession(
+                course_id=course_id,
+                faculty_id=user["id"],
+                session_date=session_date,
+                topic=topic,
+            )
+            db.add(attendance_session)
+            db.flush()
+        else:
+            attendance_session.session_date = session_date
+            attendance_session.topic = topic
+
+        existing_entries = {
+            entry.student_id: entry
+            for entry in db.scalars(
+                select(AttendanceEntry).where(
+                    AttendanceEntry.session_id == attendance_session.id
+                )
+            ).all()
+        }
 
         for student_id, status in submitted_entries:
-            db.add(
-                AttendanceEntry(
-                    session_id=attendance_session.id,
-                    student_id=student_id,
-                    status=status,
+            entry = existing_entries.get(student_id)
+            if entry is None:
+                db.add(
+                    AttendanceEntry(
+                        session_id=attendance_session.id,
+                        student_id=student_id,
+                        status=status,
+                    )
                 )
-            )
+            else:
+                entry.status = status
 
         db.commit()
 
         flash(
-            f"Attendance saved for {len(submitted_entries)} students.",
+            (
+                f"Attendance updated for {len(submitted_entries)} students."
+                if is_update
+                else f"Attendance saved for {len(submitted_entries)} students."
+            ),
             "success",
         )
-        return redirect(url_for("attendance.list_courses"))
+        return redirect(
+            url_for("attendance.list_sessions", course_id=course_id)
+        )

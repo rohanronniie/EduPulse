@@ -1,7 +1,7 @@
 
 {% extends "base.html" %}
 
-{% block title %}Enter Marks | EduPulse{% endblock %}
+{% block title %}{{ 'View Marks' if assessment.published else 'Enter Marks' }} | EduPulse{% endblock %}
 
 {% block content %}
 <section class="page-header">
@@ -21,52 +21,56 @@
 
 <section class="card">
     {% if assessment.published %}
-        <p>These results are published and cannot be edited.</p>
+        <p class="notice notice-info">Published results are shown below. This view is read-only.</p>
     {% else %}
         <p>Enter a mark for every enrolled student before saving.</p>
     {% endif %}
 
     {% if students %}
-    <form method="POST"
+    {% if not assessment.published %}
+    <form id="marksForm" method="POST"
           action="{{ url_for('assessment.enter_marks', assessment_id=assessment.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Student code</th>
-                        <th>Student name</th>
-                        <th>Marks / {{ assessment.max_marks }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for student in students %}
-                    <tr>
-                        <td>{{ student.student_code }}</td>
-                        <td>{{ student.full_name }}</td>
-                        <td>
-                            {% set saved_mark = marks_by_student.get(student.id) %}
+    {% endif %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Student code</th>
+                    <th>Student name</th>
+                    <th>Marks / {{ assessment.max_marks }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.student_code }}</td>
+                    <td>{{ student.full_name }}</td>
+                    <td>
+                        {% set saved_mark = marks_by_student.get(student.id) %}
+                        {% if assessment.published %}
+                            {{ saved_mark.marks if saved_mark else '—' }}
+                        {% else %}
                             <input type="number"
                                    name="marks_{{ student.id }}"
                                    min="0"
                                    max="{{ assessment.max_marks }}"
                                    step="any"
                                    value="{{ saved_mark.marks if saved_mark else '' }}"
-                                   required
-                                   {% if assessment.published %}disabled{% endif %}>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        {% if not assessment.published %}
+                                   required>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if not assessment.published %}
         <div class="form-actions">
             <button type="submit" class="button">Save marks</button>
         </div>
-        {% endif %}
     </form>
+    {% endif %}
     {% else %}
     <p>No students are enrolled in this course.</p>
     {% endif %}

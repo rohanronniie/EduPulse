@@ -5,23 +5,30 @@
 
 {% block content %}
 <section class="page-header">
-    <h1>Academic Support Engine</h1>
-    <p>
-        Review explainable academic indicators for students in your
-        assigned courses.
-    </p>
+    <div>
+        <p class="eyebrow">STUDENT SUCCESS</p>
+        <h1>Academic Support</h1>
+        <p>Turn explainable learning signals into timely, trackable support.</p>
+    </div>
 </section>
 
 <section class="card">
-    <h2>Select a course</h2>
+    <div class="section-heading">
+        <div>
+            <h2>Your support workspace</h2>
+            <p>Choose a subject to review its students and follow-up actions.</p>
+        </div>
+        <span>{{ courses|length }} assigned subject(s)</span>
+    </div>
 
     {% if courses %}
         <div class="course-list">
             {% for course in courses %}
                 <div class="course-item">
                     <div>
+                        <p class="eyebrow">{{ course.course_code }}</p>
                         <h3>{{ course.title }}</h3>
-                        <p>{{ course.course_code }}</p>
+                        <p>Review attendance, assessment trends, and support steps.</p>
                     </div>
 
                     <a

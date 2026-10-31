@@ -16,7 +16,7 @@ The project focuses on three practical engineering concerns: **explainable evalu
 - Evaluate academic records using configurable rules.
 - Identify attendance concerns, declining assessment performance, and low assignment completion.
 - Generate reports containing the reason for each finding and the supporting evidence.
-- Provide intervention suggestions for faculty review.
+- Turn suggested support actions into dated follow-ups with staff notes and open, in-progress, or completed status.
 
 ### What-If intervention simulator
 
@@ -26,13 +26,22 @@ Faculty can explore hypothetical changes to attendance, assessment scores, and a
 
 - Role-based authentication for faculty and students.
 - Faculty access to assigned courses, attendance management, assessment creation, marks entry, and result publishing.
+- Attendance sessions can be reopened and corrected; recording the same course, date, and topic updates the existing session.
 - Student access to their academic information and published assessment results.
 - Access restrictions that prevent students from opening faculty-only pages.
 - Attendance and assessment workflows tied to course enrollment.
 
 ### Analytics dashboard
 
-The faculty analytics dashboard brings together academic activity and course-level information to make the underlying records easier to review.
+Student dashboards group work by subject. Each subject opens a dated attendance history and its published assessment results. Faculty dashboards compare attendance and published score averages by subject; the analytics page adds course comparisons and a native SVG trend chart without a third-party chart CDN.
+
+### Support follow-through
+
+Academic Support combines explainable indicators with a lightweight follow-up workflow. Faculty can record an action, set a due date, add staff notes, and track progress. This helps teams see whether a support step was started and completed; it does not claim that the action caused an academic outcome.
+
+The repository includes an idempotent demo seed with **eight fictional students, four courses, ten weeks of attendance, three published assessments per course, and sample support follow-ups**. The names and records are synthetic and should never be presented as real institutional data.
+
+Academic reports show where their inputs come from. The saved-record report uses live attendance and published assessment data when available, with saved values as fallbacks; course support reports use live attendance and published marks, with assignment completion from saved academic records.
 
 ### Validation and security
 
@@ -96,8 +105,11 @@ EduPulse/
 │   ├── templates/
 │   └── static/
 ├── tests/
+├── Dockerfile
+├── Procfile
 ├── requirements.txt
 ├── run.py
+├── wsgi.py
 ├── seed_demo.py
 └── README.md
 ```
@@ -132,17 +144,18 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-### 4. Configure the application secret
+### 4. Configure local settings
 
-EduPulse requires an application secret key when running outside the test configuration. Generate one in PowerShell:
+Copy the example environment file, then generate a secret for the current PowerShell session:
 
 ```powershell
+Copy-Item .env.example .env
 $env:EDUPULSE_SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-This sets the key for the current terminal session. If you open a new terminal, set it again before starting the application.
+`run.py`, `wsgi.py`, and the demo seeder load values from `.env`; process environment values take precedence. You can put your generated key in `.env` to reuse it locally. Keep `.env` out of Git.
 
-For a persistent deployment, configure `EDUPULSE_SECRET_KEY` through the deployment environment rather than hard-coding it in the source code.
+The app requires `EDUPULSE_SECRET_KEY` and will not start without one. There is no built-in default key.
 
 ### 5. Start the application
 
@@ -150,7 +163,7 @@ For a persistent deployment, configure `EDUPULSE_SECRET_KEY` through the deploym
 python run.py
 ```
 
-Open the local address printed by Flask, normally:
+Open the local address printed by the development server, normally:
 
 `http://127.0.0.1:5000`
 
@@ -164,7 +177,7 @@ The repository includes a demonstration seed script. To populate the database wi
 python seed_demo.py
 ```
 
-Use the demo credentials configured in that script. For a clean demonstration, follow the script's expected database setup and avoid running it against data you need to preserve.
+The seed is idempotent for its demo records and updates demo account passwords. It does not delete unrelated records. It creates one faculty account and an individual student login for each fictional profile. Use `faculty.demo` for the faculty workspace; student logins are `sd.1` through `sd.8`, and the sign-in page lists them after seeding. All demo accounts use the short shared password `Demo123!`. Use the seed only with a disposable or explicitly chosen demonstration database, never with institutional data or a deployed database. These shared demo credentials must not be used in a deployment.
 
 ### 7. Run the tests
 
@@ -174,7 +187,7 @@ Stop the development server if necessary, then run:
 python -m pytest -q
 ```
 
-**Latest verified test result: 68 passed.**
+**Latest verified test result: 79 passed.** This result includes the current dashboard, subject detail, and marks-view updates.
 
 Run the suite again after making changes; the result above records the latest verification, not a guarantee about future code changes.
 
@@ -182,7 +195,20 @@ Run the suite again after making changes; the result above records the latest ve
 
 The test suite covers academic evaluation, input validation, database operations, authentication-related workflows, attendance, assessments, marks, and application routes.
 
-Manual verification has also included starting the application, accessing the faculty analytics page, and confirming that a student account is denied access to faculty-only analytics.
+The `/health` endpoint checks both the application and its configured database connection and returns a service-unavailable response if the database cannot be reached.
+
+## Deployment preparation
+
+`wsgi.py` serves the application with Waitress and uses the hosting provider's `PORT` value. `Procfile` is provided for platforms that use it; the Dockerfile provides a small, non-root container image. Flask's built-in development server in `run.py` is for local development only. Production WSGI serving is prepared separately, consistent with Flask's deployment guidance. [Flask production deployment guidance](https://flask.palletsprojects.com/en/stable/deploying/), [Waitress documentation](https://docs.pylonsproject.org/projects/waitress/en/stable/)
+
+Configure these environment variables on the hosting platform:
+
+- `EDUPULSE_ENV=production` enables secure session cookies and HSTS.
+- `EDUPULSE_SECRET_KEY` must be a strong, private value supplied by the platform's secret store.
+- `EDUPULSE_DATABASE_URL` should point to a persistent PostgreSQL service using `postgresql+psycopg://...` for a public deployment. SQLite remains the default for local development.
+- `PORT` is normally provided by the host.
+
+The app creates missing tables at startup, but it does not include a versioned migration system. Existing data, infrastructure, domain/TLS, backups, monitoring, and privacy requirements must be reviewed before a public launch. Do not seed the demo cohort in production.
 
 ## Limitations and responsible use
 
@@ -192,14 +218,15 @@ EduPulse is a portfolio project and demonstration of academic record management 
 - The configured thresholds require context-specific validation before use in an educational institution.
 - Intervention suggestions should support, not replace, informed decisions by academic staff.
 - Real student records require appropriate authorization, privacy controls, retention policies, backups, and operational safeguards.
-- Production deployment requires a deliberate review of authentication, authorization, configuration, database handling, and other security requirements.
+- The follow-up log is an operational aid, not a validated intervention-outcome study.
+- Public deployment scaffolding is included, but a versioned database migration and backup/restore process are still needed before handling institutional records.
 
 Demonstrations should use synthetic data or data that is appropriately authorized for the intended purpose.
 
 ## Possible next steps
 
 - Add controlled data export and reporting.
-- Improve database migration and backup workflows.
+- Add a versioned migration and backup/restore workflow.
 - Add broader integration and security testing.
 - Evaluate academic indicators using appropriately governed data and clearly defined criteria.
 - Prepare a deployment configuration with production-grade monitoring and operational safeguards.

@@ -1,13 +1,13 @@
 
 {% extends "base.html" %}
 
-{% block title %}Take Attendance | EduPulse{% endblock %}
+{% block title %}{{ 'Edit Attendance' if attendance_session else 'Record Attendance' }} | EduPulse{% endblock %}
 
 {% block content %}
 <section class="page-header">
     <div>
         <p class="eyebrow">{{ course.course_code }}</p>
-        <h1>Take Attendance</h1>
+        <h1>{{ 'Edit Attendance' if attendance_session else 'Record Attendance' }}</h1>
         <p>{{ course.title }}</p>
     </div>
     <a class="button button-secondary" href="{{ url_for('attendance.list_courses') }}">
@@ -17,6 +17,9 @@
 
 <form method="POST" class="card">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if attendance_session %}
+        <input type="hidden" name="session_id" value="{{ attendance_session.id }}">
+    {% endif %}
     <div class="form-grid">
         <div class="form-group">
             <label for="session_date">Class date</label>
@@ -37,9 +40,18 @@
                 name="topic"
                 maxlength="200"
                 placeholder="e.g. Introduction to Machine Learning"
+                value="{{ attendance_session.topic if attendance_session else '' }}"
             >
         </div>
     </div>
+
+    <p class="form-help attendance-edit-note">
+        {% if attendance_session %}
+            You are updating the saved session. Changes replace the current statuses for enrolled students.
+        {% else %}
+            Saving the same course, date, and topic again will reopen and update that session.
+        {% endif %}
+    </p>
 
     <div class="section-heading">
         <h2>Student roster</h2>
@@ -63,9 +75,9 @@
                         <td>{{ student.full_name }}</td>
                         <td>
                             <select name="status_{{ student.id }}" required>
-                                <option value="present" selected>Present</option>
-                                <option value="absent">Absent</option>
-                                <option value="late">Late</option>
+                                <option value="present" {% if status_by_student.get(student.id, 'present') == 'present' %}selected{% endif %}>Present</option>
+                                <option value="absent" {% if status_by_student.get(student.id) == 'absent' %}selected{% endif %}>Absent</option>
+                                <option value="late" {% if status_by_student.get(student.id) == 'late' %}selected{% endif %}>Late</option>
                             </select>
                         </td>
                     </tr>
@@ -76,7 +88,7 @@
 
         <div class="form-actions">
             <button type="submit" class="button">
-                Save attendance
+                {{ 'Update attendance' if attendance_session else 'Save attendance' }}
             </button>
         </div>
     {% else %}

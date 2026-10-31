@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from sqlalchemy import create_engine, event, select
@@ -7,7 +9,7 @@ from werkzeug.security import generate_password_hash
 from datetime import date
 
 from src import create_app
-from src.database import Base
+from src.database import Base, DATABASE_PATH, resolve_database_url
 from src.models import Course, Student, StudentCourse
 from src.academic_models import AcademicRecord
 from src.portal_models import (
@@ -17,7 +19,68 @@ from src.portal_models import (
     AttendanceEntry,
     Assessment,
     AssessmentMark,
+    SupportFollowUp,
 )
+
+
+def test_database_url_defaults_to_sqlite_when_environment_value_is_blank():
+    fallback_url = f"sqlite:///{DATABASE_PATH.as_posix()}"
+
+    assert resolve_database_url({}) == fallback_url
+    assert resolve_database_url({"EDUPULSE_DATABASE_URL": ""}) == fallback_url
+    assert resolve_database_url({"EDUPULSE_DATABASE_URL": "   "}) == fallback_url
+
+
+def test_database_url_normalizes_postgresql_scheme():
+    assert (
+        resolve_database_url(
+            {"EDUPULSE_DATABASE_URL": "postgresql://user:pass@db.example/app"}
+        )
+        == "postgresql+psycopg://user:pass@db.example/app"
+    )
+
+
+def test_sign_in_page_offers_password_toggle_and_seeded_demo_accounts():
+    app, test_engine = create_test_app()
+
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(
+                student_code="DEMO001",
+                full_name="Alex Morgan",
+            )
+            session.add(student)
+            session.flush()
+            session.add_all(
+                [
+                    User(
+                        username="faculty.demo",
+                        password_hash=generate_password_hash("Demo123!"),
+                        role="faculty",
+                    ),
+                    User(
+                        username="sd.1",
+                        password_hash=generate_password_hash("Demo123!"),
+                        role="student",
+                        student_id=student.id,
+                    ),
+                ]
+            )
+            session.commit()
+
+        response = app.test_client().get("/login")
+
+        assert response.status_code == 200
+        assert b"Choose a faculty or student account" in response.data
+        assert b"Alex Morgan" in response.data
+        assert b"faculty.demo" in response.data
+        assert b"sd.1" in response.data
+        assert b"Demo123!" in response.data
+        assert b'aria-label="Show password"' in response.data
+        assert b"passwordInput.type = isVisible ?" in response.data
+        assert b'getElementById("loginForm").requestSubmit()' in response.data
+    finally:
+        test_engine.dispose()
 
     
 def create_test_app():
@@ -124,6 +187,149 @@ def login_as_student(client, test_engine):
     )
 
 
+def test_csrf_protect_rejects_missing_and_invalid_tokens():
+    app, test_engine = create_test_app()
+    app.config["WTF_CSRF_ENABLED"] = True
+
+    try:
+        client = app.test_client()
+        missing_token = client.post(
+            "/login",
+            data={
+                "username": "faculty.test",
+                "password": "TestFaculty@2026",
+            },
+        )
+        invalid_token = client.post(
+            "/login",
+            data={
+                "username": "faculty.test",
+                "password": "TestFaculty@2026",
+                "csrf_token": "not-a-valid-token",
+            },
+        )
+
+        assert missing_token.status_code == 400
+        assert invalid_token.status_code == 400
+
+        import re
+
+        login_page = client.get("/login")
+        match = re.search(
+            rb'name="csrf_token"\s+value="([^"]+)"',
+            login_page.data,
+        )
+        assert match is not None
+        valid_token = match.group(1).decode()
+        accepted_token = client.post(
+            "/login",
+            data={
+                "username": "faculty.test",
+                "password": "TestFaculty@2026",
+                "csrf_token": valid_token,
+            },
+        )
+        assert accepted_token.status_code == 302
+    finally:
+        test_engine.dispose()
+
+
+def test_attendance_can_edit_existing_session_and_record_another_topic():
+    app, test_engine = create_test_app()
+
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            faculty = session.scalar(
+                select(User).where(User.username == "faculty.test")
+            )
+            student = Student(
+                student_code="ATT001",
+                full_name="Attendance Test Student",
+            )
+            course = Course(
+                course_code="ATT101",
+                title="Attendance Test Course",
+            )
+            session.add_all([student, course])
+            session.flush()
+            session.add_all([
+                StudentCourse(student_id=student.id, course_id=course.id),
+                FacultyCourse(faculty_id=faculty.id, course_id=course.id),
+            ])
+            session.commit()
+            course_id = course.id
+            student_id = student.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        post_data = {
+            "session_date": "2026-10-30",
+            "topic": "Database design",
+            f"status_{student_id}": "present",
+        }
+
+        first = client.post(f"/attendance/course/{course_id}", data=post_data)
+        with sessionmaker(bind=test_engine)() as session:
+            recorded_session_id = session.scalar(
+                select(AttendanceSession.id).where(
+                    AttendanceSession.course_id == course_id
+                )
+            )
+        update = client.post(
+            f"/attendance/course/{course_id}",
+            data={**post_data, f"status_{student_id}": "absent"},
+        )
+        edit_page = client.get(
+            f"/attendance/course/{course_id}?session_id={recorded_session_id}"
+        )
+        another_topic = client.post(
+            f"/attendance/course/{course_id}",
+            data={**post_data, "topic": "Transactions"},
+        )
+
+        assert first.status_code == 302
+        assert update.status_code == 302
+        assert edit_page.status_code == 200
+        assert b"Edit Attendance" in edit_page.data
+        assert b'value="Database design"' in edit_page.data
+        assert b'value="absent" selected' in edit_page.data
+        assert another_topic.status_code == 302
+
+        sessions_page = client.get(
+            f"/attendance/course/{course_id}/sessions"
+        )
+        assert sessions_page.status_code == 200
+        assert b"Database design" in sessions_page.data
+        assert b"Transactions" in sessions_page.data
+
+        with sessionmaker(bind=test_engine)() as session:
+            sessions = session.scalars(
+                select(AttendanceSession).where(
+                    AttendanceSession.course_id == course_id
+                )
+            ).all()
+            assert len(sessions) == 2
+            attendance_by_topic = {
+                item.topic: item for item in sessions
+            }
+            original_entry = session.scalar(
+                select(AttendanceEntry).where(
+                    AttendanceEntry.session_id
+                    == attendance_by_topic["Database design"].id,
+                    AttendanceEntry.student_id == student_id,
+                )
+            )
+            assert original_entry.status == "absent"
+            assert session.scalar(
+                select(AttendanceEntry.id).where(
+                    AttendanceEntry.session_id
+                    == attendance_by_topic["Transactions"].id
+                )
+            ) is not None
+    finally:
+        test_engine.dispose()
+
+
 def test_homepage_loads():
     app = create_app(
         {
@@ -155,6 +361,26 @@ def test_health_endpoint():
     assert response.status_code == 200
     assert response.json["status"] == "healthy"
     assert response.json["application"] == "EduPulse"
+    assert response.json["database"] == "available"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+
+
+def test_production_configuration_marks_auth_cookies_secure(monkeypatch):
+    monkeypatch.setenv("EDUPULSE_ENV", "production")
+    app = create_app(
+        {
+            "TESTING": True,
+            "INITIALIZE_DATABASE": False,
+            "WTF_CSRF_ENABLED": False,
+            "SECRET_KEY": "test-secret",
+        }
+    )
+
+    assert app.config["SESSION_COOKIE_SECURE"] is True
+    response = app.test_client().get("/health")
+    assert response.status_code == 200
+    assert "max-age=31536000" in response.headers["Strict-Transport-Security"]
 
 
 def test_student_management_requires_login():
@@ -731,6 +957,243 @@ def test_marks_are_saved_for_enrolled_students():
         test_engine.dispose()
 
 
+def test_faculty_can_view_published_marks_but_cannot_change_them():
+    app, test_engine = create_test_app()
+
+    try:
+        ids = create_assessment_fixture(test_engine)
+        with sessionmaker(bind=test_engine)() as session:
+            faculty_id = session.scalar(
+                select(User.id).where(User.username == "faculty.test")
+            )
+            assessment = Assessment(
+                course_id=ids["course_id"],
+                faculty_id=faculty_id,
+                title="Published marks view",
+                max_marks=30,
+                assessment_date=date(2026, 10, 27),
+                published=True,
+            )
+            session.add(assessment)
+            session.flush()
+            session.add_all([
+                AssessmentMark(
+                    assessment_id=assessment.id,
+                    student_id=ids["student_one_id"],
+                    marks=24,
+                ),
+                AssessmentMark(
+                    assessment_id=assessment.id,
+                    student_id=ids["student_two_id"],
+                    marks=18,
+                ),
+            ])
+            session.commit()
+            assessment_id = assessment.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+
+        page = client.get(f"/assessments/{assessment_id}/marks")
+        assert page.status_code == 200
+        assert b"Published results are shown below" in page.data
+        assert b"Assessment Student One" in page.data
+        assert re.search(rb"<td>\s*24(?:\.0)?\s*</td>", page.data)
+        assert b"Save marks" not in page.data
+
+        update = client.post(
+            f"/assessments/{assessment_id}/marks",
+            data={
+                f"marks_{ids['student_one_id']}": "29",
+                f"marks_{ids['student_two_id']}": "18",
+            },
+            follow_redirects=True,
+        )
+        assert update.status_code == 200
+        assert b"Published results are locked" in update.data
+        with sessionmaker(bind=test_engine)() as session:
+            saved = session.scalar(
+                select(AssessmentMark).where(
+                    AssessmentMark.assessment_id == assessment_id,
+                    AssessmentMark.student_id == ids["student_one_id"],
+                )
+            )
+            assert saved.marks == 24
+    finally:
+        test_engine.dispose()
+
+
+def test_student_and_faculty_dashboards_render_attendance_and_mark_bars():
+    app, test_engine = create_test_app()
+
+    try:
+        ids = create_assessment_fixture(test_engine)
+        with sessionmaker(bind=test_engine)() as session:
+            faculty = session.scalar(
+                select(User).where(User.username == "faculty.test")
+            )
+            student = session.get(Student, ids["student_one_id"])
+            session.add(
+                User(
+                    username="chart.student",
+                    password_hash=generate_password_hash("StudentTest@2026"),
+                    role="student",
+                    student_id=student.id,
+                )
+            )
+            attendance_session = AttendanceSession(
+                course_id=ids["course_id"],
+                faculty_id=faculty.id,
+                session_date=date(2026, 10, 25),
+                topic="Dashboard chart session",
+            )
+            assessment = Assessment(
+                course_id=ids["course_id"],
+                faculty_id=faculty.id,
+                title="Dashboard chart assessment",
+                max_marks=30,
+                assessment_date=date(2026, 10, 26),
+                published=True,
+            )
+            session.add_all([attendance_session, assessment])
+            session.flush()
+            session.add_all([
+                AttendanceEntry(
+                    session_id=attendance_session.id,
+                    student_id=ids["student_one_id"],
+                    status="present",
+                ),
+                AttendanceEntry(
+                    session_id=attendance_session.id,
+                    student_id=ids["student_two_id"],
+                    status="absent",
+                ),
+                AssessmentMark(
+                    assessment_id=assessment.id,
+                    student_id=ids["student_one_id"],
+                    marks=24,
+                ),
+                AssessmentMark(
+                    assessment_id=assessment.id,
+                    student_id=ids["student_two_id"],
+                    marks=18,
+                ),
+            ])
+            session.commit()
+
+        faculty_client = app.test_client()
+        login_as_faculty(faculty_client)
+        faculty_dashboard = faculty_client.get("/")
+        assert b"Attendance by subject" in faculty_dashboard.data
+        assert b"Assessment average by subject" in faculty_dashboard.data
+        assert b"70.0%" in faculty_dashboard.data
+        assert b"Students" in faculty_dashboard.data
+        assert b"Add Student" not in faculty_dashboard.data
+        assert b"Add Course" not in faculty_dashboard.data
+
+        student_client = app.test_client()
+        student_login = student_client.post(
+            "/login",
+            data={
+                "username": "chart.student",
+                "password": "StudentTest@2026",
+            },
+            follow_redirects=True,
+        )
+        assert student_login.status_code == 200
+        assert b"Attendance by subject" in student_login.data
+        assert b"Assessment scores" in student_login.data
+        assert b"100.0%" in student_login.data
+        assert b"24.0 / 30.0 marks" in student_login.data
+        assert f"/student/courses/{ids['course_id']}".encode() in student_login.data
+        assert b"View subject details" in student_login.data
+    finally:
+        test_engine.dispose()
+
+
+def test_student_subject_detail_shows_dates_attendance_and_published_marks():
+    app, test_engine = create_test_app()
+
+    try:
+        ids = create_assessment_fixture(test_engine)
+        with sessionmaker(bind=test_engine)() as session:
+            faculty_id = session.scalar(
+                select(User.id).where(User.username == "faculty.test")
+            )
+            student = session.get(Student, ids["student_one_id"])
+            session.add(
+                User(
+                    username="detail.student",
+                    password_hash=generate_password_hash("StudentTest@2026"),
+                    role="student",
+                    student_id=student.id,
+                )
+            )
+            class_session = AttendanceSession(
+                course_id=ids["course_id"],
+                faculty_id=faculty_id,
+                session_date=date(2026, 10, 28),
+                topic="Functions and scope",
+            )
+            published = Assessment(
+                course_id=ids["course_id"],
+                faculty_id=faculty_id,
+                title="Midterm assessment",
+                max_marks=40,
+                assessment_date=date(2026, 10, 29),
+                published=True,
+            )
+            draft = Assessment(
+                course_id=ids["course_id"],
+                faculty_id=faculty_id,
+                title="Unpublished practice",
+                max_marks=20,
+                assessment_date=date(2026, 10, 30),
+                published=False,
+            )
+            session.add_all([class_session, published, draft])
+            session.flush()
+            session.add_all([
+                AttendanceEntry(
+                    session_id=class_session.id,
+                    student_id=student.id,
+                    status="late",
+                ),
+                AssessmentMark(
+                    assessment_id=published.id,
+                    student_id=student.id,
+                    marks=32,
+                ),
+                AssessmentMark(
+                    assessment_id=draft.id,
+                    student_id=student.id,
+                    marks=19,
+                ),
+            ])
+            session.commit()
+
+        client = app.test_client()
+        client.post(
+            "/login",
+            data={
+                "username": "detail.student",
+                "password": "StudentTest@2026",
+            },
+        )
+        page = client.get(f"/student/courses/{ids['course_id']}")
+        assert page.status_code == 200
+        assert b"Attendance by date" in page.data
+        assert b"28 Oct 2026" in page.data
+        assert b"Functions and scope" in page.data
+        assert b"Late" in page.data
+        assert b"Midterm assessment" in page.data
+        assert b"32" in page.data
+        assert b"Unpublished practice" not in page.data
+        assert client.get("/student/courses/9999").status_code == 404
+    finally:
+        test_engine.dispose()
+
+
 def test_invalid_marks_are_rejected_without_saving_any_marks():
     app, test_engine = create_test_app()
 
@@ -940,6 +1403,118 @@ def create_analytics_fixture(test_engine):
         }
 
 
+def test_academic_support_tracks_follow_up_to_completion():
+    app, test_engine = create_test_app()
+
+    try:
+        ids = create_analytics_fixture(test_engine)
+        with sessionmaker(bind=test_engine)() as session:
+            enrollment = session.scalar(
+                select(StudentCourse).where(
+                    StudentCourse.student_id == ids["student_id"],
+                    StudentCourse.course_id == ids["course_id"],
+                )
+            )
+
+            attendance_session = AttendanceSession(
+                course_id=ids["course_id"],
+                faculty_id=ids["faculty_id"],
+                session_date=date(2026, 10, 1),
+                topic="Support test session",
+            )
+            first_assessment = Assessment(
+                course_id=ids["course_id"],
+                faculty_id=ids["faculty_id"],
+                title="Support test 1",
+                max_marks=100,
+                assessment_date=date(2026, 10, 2),
+                published=True,
+            )
+            second_assessment = Assessment(
+                course_id=ids["course_id"],
+                faculty_id=ids["faculty_id"],
+                title="Support test 2",
+                max_marks=100,
+                assessment_date=date(2026, 10, 3),
+                published=True,
+            )
+            session.add_all([
+                attendance_session,
+                first_assessment,
+                second_assessment,
+            ])
+            session.flush()
+            session.add_all([
+                AttendanceEntry(
+                    session_id=attendance_session.id,
+                    student_id=ids["student_id"],
+                    status="absent",
+                ),
+                AssessmentMark(
+                    assessment_id=first_assessment.id,
+                    student_id=ids["student_id"],
+                    marks=82,
+                ),
+                AssessmentMark(
+                    assessment_id=second_assessment.id,
+                    student_id=ids["student_id"],
+                    marks=54,
+                ),
+                AcademicRecord(
+                    student_course_id=enrollment.id,
+                    attendance_percentage=0,
+                    assessment_scores=[82, 54],
+                    completed_assignments=4,
+                    total_assignments=10,
+                ),
+            ])
+            session.commit()
+            enrollment_id = enrollment.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        report = client.get(f"/academic-support/{ids['course_id']}")
+
+        assert report.status_code == 200
+        assert b"Review recent assessments with the student" in report.data
+        assert b"Record a support follow-up" in report.data
+        assert b"&#39;recommendation&#39;" not in report.data
+
+        created = client.post(
+            f"/academic-support/{ids['course_id']}/follow-ups",
+            data={
+                "enrollment_id": str(enrollment_id),
+                "finding_rule": "assessment_trend",
+                "action_text": "Review recent assessments with the student.",
+                "notes": "Arrange a short support check-in.",
+                "due_date": "2026-11-07",
+            },
+            follow_redirects=True,
+        )
+        assert created.status_code == 200
+        assert b"Follow-up history" in created.data
+        assert b"Arrange a short support check-in." in created.data
+
+        with sessionmaker(bind=test_engine)() as session:
+            follow_up = session.scalar(select(SupportFollowUp))
+            follow_up_id = follow_up.id
+            assert follow_up.status == "open"
+
+        updated = client.post(
+            f"/academic-support/follow-ups/{follow_up_id}/status",
+            data={"status": "completed"},
+            follow_redirects=True,
+        )
+        assert updated.status_code == 200
+        assert b"Completed" in updated.data
+
+        with sessionmaker(bind=test_engine)() as session:
+            follow_up = session.get(SupportFollowUp, follow_up_id)
+            assert follow_up.status == "completed"
+    finally:
+        test_engine.dispose()
+
+
 def test_analytics_requires_login():
     app, test_engine = create_test_app()
 
@@ -1102,6 +1677,8 @@ def test_analytics_uses_published_assessments_only():
         assert b"Draft Test" not in response.data
         assert b"80.0%" in response.data
         assert b"10.0%" not in response.data
+        assert b"Assessment trend" in response.data
+        assert b'id="assessmentTrend"' in response.data
     finally:
         test_engine.dispose()
 

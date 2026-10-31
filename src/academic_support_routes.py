@@ -1,5 +1,16 @@
 
-from flask import Blueprint, abort, current_app, render_template
+from datetime import date
+
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from sqlalchemy import select
 
 from src.academic_engine import (
@@ -7,7 +18,7 @@ from src.academic_engine import (
     recommend_interventions,
 )
 from src.academic_models import AcademicRecord
-from src.auth_routes import role_required
+from src.auth_routes import get_current_user, role_required
 from src.models import Course, Student, StudentCourse
 from src.portal_models import (
     Assessment,
@@ -15,6 +26,7 @@ from src.portal_models import (
     AttendanceEntry,
     AttendanceSession,
     FacultyCourse,
+    SupportFollowUp,
 )
 
 
@@ -29,8 +41,6 @@ academic_support_bp = Blueprint(
 @role_required("faculty")
 def index():
     """List courses assigned to the current faculty member."""
-    from src.auth_routes import get_current_user
-
     user = get_current_user()
     session_factory = current_app.config["SESSION_FACTORY"]
 
@@ -52,8 +62,6 @@ def index():
 @role_required("faculty")
 def course_report(course_id):
     """Generate explainable support reports for an assigned course."""
-    from src.auth_routes import get_current_user
-
     user = get_current_user()
     session_factory = current_app.config["SESSION_FACTORY"]
 
@@ -77,6 +85,21 @@ def course_report(course_id):
             .where(StudentCourse.course_id == course_id)
             .order_by(StudentCourse.id)
         ).all()
+
+        follow_ups_by_enrollment = {}
+        follow_ups = db.scalars(
+            select(SupportFollowUp)
+            .join(
+                StudentCourse,
+                StudentCourse.id == SupportFollowUp.student_course_id,
+            )
+            .where(StudentCourse.course_id == course_id)
+            .order_by(SupportFollowUp.created_at.desc())
+        ).all()
+        for follow_up in follow_ups:
+            follow_ups_by_enrollment.setdefault(
+                follow_up.student_course_id, []
+            ).append(follow_up)
 
         reports = []
 
@@ -167,11 +190,144 @@ def course_report(course_id):
                     "attendance_percentage": attendance_percentage,
                     "assessment_count": len(assessment_scores),
                     "assignment_data_available": academic_record is not None,
+                    "enrollment_id": enrollment.id,
+                    "follow_ups": follow_ups_by_enrollment.get(
+                        enrollment.id, []
+                    ),
                 }
             )
+
+        summary = {
+            "students": len(reports),
+            "support_recommended": sum(
+                item["report"]["overall_status"] == "support_recommended"
+                for item in reports
+            ),
+            "open_follow_ups": sum(
+                follow_up.status != "completed"
+                for item in reports
+                for follow_up in item["follow_ups"]
+            ),
+        }
 
         return render_template(
             "academic_support_report.html",
             course=course,
             reports=reports,
+            summary=summary,
         )
+
+
+@academic_support_bp.route("/<int:course_id>/follow-ups", methods=["POST"])
+@role_required("faculty")
+def create_follow_up(course_id):
+    """Record a support action for a student in an assigned course."""
+    user = get_current_user()
+    session_factory = current_app.config["SESSION_FACTORY"]
+
+    enrollment_id = request.form.get("enrollment_id", type=int)
+    finding_rule = request.form.get("finding_rule", "").strip()
+    action_text = request.form.get("action_text", "").strip()
+    notes = request.form.get("notes", "").strip()
+    due_date_value = request.form.get("due_date", "").strip()
+
+    if finding_rule not in {
+        "attendance",
+        "assessment_trend",
+        "assignment_completion",
+        "general",
+    }:
+        abort(400)
+
+    if not action_text or len(action_text) > 300 or len(notes) > 2000:
+        flash("Enter a support action and keep notes under 2,000 characters.", "error")
+        return redirect(
+            url_for("academic_support.course_report", course_id=course_id)
+        )
+
+    due_date = None
+    if due_date_value:
+        try:
+            due_date = date.fromisoformat(due_date_value)
+        except ValueError:
+            flash("Enter a valid follow-up date.", "error")
+            return redirect(
+                url_for("academic_support.course_report", course_id=course_id)
+            )
+
+    with session_factory() as db:
+        enrollment = db.scalar(
+            select(StudentCourse)
+            .join(
+                FacultyCourse,
+                FacultyCourse.course_id == StudentCourse.course_id,
+            )
+            .where(
+                StudentCourse.id == enrollment_id,
+                StudentCourse.course_id == course_id,
+                FacultyCourse.faculty_id == user["id"],
+            )
+        )
+        if enrollment is None:
+            abort(404)
+
+        db.add(
+            SupportFollowUp(
+                student_course_id=enrollment.id,
+                faculty_id=user["id"],
+                finding_rule=finding_rule,
+                action_text=action_text,
+                notes=notes,
+                due_date=due_date,
+            )
+        )
+        db.commit()
+
+    flash("Support follow-up recorded.", "success")
+    return redirect(
+        url_for("academic_support.course_report", course_id=course_id)
+    )
+
+
+@academic_support_bp.route(
+    "/follow-ups/<int:follow_up_id>/status",
+    methods=["POST"],
+)
+@role_required("faculty")
+def update_follow_up_status(follow_up_id):
+    """Update the completion state of an assigned course follow-up."""
+    user = get_current_user()
+    status = request.form.get("status", "").strip()
+    if status not in {"open", "in_progress", "completed"}:
+        abort(400)
+
+    session_factory = current_app.config["SESSION_FACTORY"]
+    with session_factory() as db:
+        follow_up = db.scalar(
+            select(SupportFollowUp)
+            .join(
+                StudentCourse,
+                StudentCourse.id == SupportFollowUp.student_course_id,
+            )
+            .join(
+                FacultyCourse,
+                FacultyCourse.course_id == StudentCourse.course_id,
+            )
+            .where(
+                SupportFollowUp.id == follow_up_id,
+                FacultyCourse.faculty_id == user["id"],
+            )
+        )
+        if follow_up is None:
+            abort(404)
+
+        follow_up.status = status
+        db.commit()
+
+        enrollment = db.get(StudentCourse, follow_up.student_course_id)
+        course_id = enrollment.course_id
+
+    flash("Follow-up status updated.", "success")
+    return redirect(
+        url_for("academic_support.course_report", course_id=course_id)
+    )

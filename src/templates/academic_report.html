@@ -5,10 +5,18 @@
 <section class="page-header">
     <h1>Academic Support Report</h1>
     <p>{{ data.student_name }} — {{ data.course_code }}: {{ data.course_title }}</p>
-    <p>This report applies configurable rules to the recorded data. It is not a validated prediction of academic outcomes.</p>
+    <p class="report-disclaimer">This report applies configurable rules to the recorded data. It is not a validated prediction of academic outcomes.</p>
 </section>
 
 <section class="panel">
+    <div class="data-sources" aria-label="Data used in this report">
+        <h2>Data used</h2>
+        <ul>
+            <li><strong>Attendance:</strong> {{ data.attendance_source }}</li>
+            <li><strong>Assessment scores:</strong> {{ data.assessment_source }}</li>
+            <li><strong>Assignments:</strong> {{ data.assignment_source }}</li>
+        </ul>
+    </div>
     <h2>Overall status: {{ report.overall_status|replace('_', ' ')|title }}</h2>
     {% for rule_name, finding in report.findings.items() %}
         <article>

@@ -202,7 +202,7 @@ def enter_marks(assessment_id):
         if assessment is None:
             return "Assessment not found or course not assigned to this faculty member.", 404
 
-        if assessment.published:
+        if assessment.published and request.method == "POST":
             flash(
                 "Published results are locked against further mark changes.",
                 "error",

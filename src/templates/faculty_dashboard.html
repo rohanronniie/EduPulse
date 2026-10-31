@@ -10,6 +10,17 @@
     <p>Your teaching overview and assigned subjects.</p>
 </section>
 
+<section class="dashboard-shortcuts" aria-label="Academic workspace shortcuts">
+    <a class="dashboard-shortcut" href="{{ url_for('analytics.dashboard') }}">
+        <span class="shortcut-label">Review performance</span>
+        <strong>Open analytics <span aria-hidden="true">&rarr;</span></strong>
+    </a>
+    <a class="dashboard-shortcut" href="{{ url_for('academic_support.index') }}">
+        <span class="shortcut-label">Support students</span>
+        <strong>View support reports <span aria-hidden="true">&rarr;</span></strong>
+    </a>
+</section>
+
 <section class="dashboard-grid">
     <article class="card">
         <p class="stat-label">Assigned Subjects</p>
@@ -29,6 +40,88 @@
     <article class="card">
         <p class="stat-label">Assessments</p>
         <h2>{{ assessment_count }}</h2>
+    </article>
+
+    <article class="card">
+        <p class="stat-label">Open follow-ups</p>
+        <h2>{{ open_follow_up_count }}</h2>
+        <p class="stat-description">Support steps still in progress</p>
+    </article>
+</section>
+
+<section class="dashboard-chart-grid" aria-label="Teaching performance charts">
+    <article class="card dashboard-chart-card">
+        <div class="chart-heading">
+            <div>
+                <p class="eyebrow">CLASS PARTICIPATION</p>
+                <h2>Attendance by subject</h2>
+            </div>
+            <span class="chart-unit">Present + late</span>
+        </div>
+        {% set attendance_available = namespace(value=false) %}
+        {% for item in course_analytics %}
+            {% if item.attendance_percentage is not none %}{% set attendance_available.value = true %}{% endif %}
+        {% endfor %}
+        {% if attendance_available.value %}
+        <div class="metric-bar-list">
+            {% for item in course_analytics %}
+                {% if item.attendance_percentage is not none %}
+                <div class="metric-bar-item">
+                    <div class="metric-bar-heading">
+                        <span>{{ item.course.title }}</span>
+                        <strong>{{ item.attendance_percentage }}%</strong>
+                    </div>
+                    <div class="metric-bar-track" role="progressbar"
+                         aria-label="{{ item.course.title }} attendance"
+                         aria-valuemin="0" aria-valuemax="100"
+                         aria-valuenow="{{ item.attendance_percentage }}">
+                        <span class="metric-bar-fill metric-bar-attendance"
+                              style="width: {{ item.attendance_percentage }}%"></span>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="chart-empty-state">Attendance will appear here after class sessions are recorded.</p>
+        {% endif %}
+    </article>
+
+    <article class="card dashboard-chart-card">
+        <div class="chart-heading">
+            <div>
+                <p class="eyebrow">PUBLISHED RESULTS</p>
+                <h2>Assessment average by subject</h2>
+            </div>
+            <span class="chart-unit">Score · %</span>
+        </div>
+        {% set marks_available = namespace(value=false) %}
+        {% for item in course_analytics %}
+            {% if item.average_percentage is not none %}{% set marks_available.value = true %}{% endif %}
+        {% endfor %}
+        {% if marks_available.value %}
+        <div class="metric-bar-list">
+            {% for item in course_analytics %}
+                {% if item.average_percentage is not none %}
+                <div class="metric-bar-item">
+                    <div class="metric-bar-heading">
+                        <span>{{ item.course.title }}</span>
+                        <strong>{{ item.average_percentage }}%</strong>
+                    </div>
+                    <div class="metric-bar-track" role="progressbar"
+                         aria-label="{{ item.course.title }} average published assessment score"
+                         aria-valuemin="0" aria-valuemax="100"
+                         aria-valuenow="{{ item.average_percentage }}">
+                        <span class="metric-bar-fill metric-bar-score"
+                              style="width: {{ item.average_percentage }}%"></span>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="chart-empty-state">Course averages appear after marks are entered and published.</p>
+        {% endif %}
     </article>
 </section>
 

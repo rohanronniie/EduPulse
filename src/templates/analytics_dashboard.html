@@ -6,16 +6,68 @@
 
 {% block content %}
 <section class="page-heading">
-    <h1>Academic Analytics</h1>
-    <p>
-        Review attendance and published assessment performance
-        across your assigned subjects.
-    </p>
+    <div>
+        <p class="eyebrow">FACULTY INTELLIGENCE</p>
+        <h1>Academic Analytics</h1>
+        <p>See the patterns behind attendance and published results.</p>
+        <p class="analytics-data-note">
+            Attendance uses recorded class entries. Assessment figures use published
+            marks only; unpublished work is excluded.
+        </p>
+    </div>
 </section>
 
 {% if course_analytics %}
-    <section class="card">
-        <h2>Course Performance</h2>
+    <section class="analytics-summary-grid" aria-label="Academic overview">
+        <article class="analytics-summary-card">
+            <span>Assigned subjects</span>
+            <strong>{{ analytics_summary.courses }}</strong>
+            <small>Courses in this view</small>
+        </article>
+        <article class="analytics-summary-card">
+            <span>Course enrollments</span>
+            <strong>{{ analytics_summary.course_enrollments }}</strong>
+            <small>Across assigned subjects</small>
+        </article>
+        <article class="analytics-summary-card">
+            <span>Attendance rate</span>
+            <strong>{% if analytics_summary.attendance_percentage is not none %}{{ analytics_summary.attendance_percentage }}%{% else %}—{% endif %}</strong>
+            <small>Present or late</small>
+        </article>
+        <article class="analytics-summary-card">
+            <span>Average assessment</span>
+            <strong>{% if analytics_summary.average_percentage is not none %}{{ analytics_summary.average_percentage }}%{% else %}—{% endif %}</strong>
+            <small>Published marks</small>
+        </article>
+    </section>
+
+    <section class="card analytics-trend-card">
+        <div class="chart-heading">
+            <div>
+                <p class="eyebrow">PERFORMANCE OVER TIME</p>
+                <h2>Assessment trend</h2>
+                <p class="analytics-description">
+                    Average score at each published assessment, by subject.
+                </p>
+            </div>
+            <span class="chart-unit">Score · %</span>
+        </div>
+        <div class="analytics-trend-wrap">
+            <svg id="assessmentTrend" class="analytics-trend" role="img" aria-label="Published assessment score trends by subject"></svg>
+        </div>
+        <div id="assessmentTrendLegend" class="analytics-trend-legend" aria-label="Chart legend"></div>
+        <p id="assessmentTrendEmpty" class="analytics-empty" hidden>
+            Published results will appear here after marks are entered.
+        </p>
+    </section>
+
+    <section class="card analytics-performance-card">
+        <div class="section-heading">
+            <div>
+                <h2>Course Performance</h2>
+                <p>Summary across {{ course_analytics|length }} assigned subject(s).</p>
+            </div>
+        </div>
 
         <div class="table-wrapper">
             <table class="analytics-table">
@@ -145,6 +197,8 @@
     const courseLabels = {{ course_analytics | map(attribute='course.title') | list | tojson }};
     const attendanceValues = {{ course_analytics | map(attribute='attendance_percentage') | list | tojson }};
     const assessmentValues = {{ course_analytics | map(attribute='average_percentage') | list | tojson }};
+    const timelineLabels = {{ assessment_timeline.labels | tojson }};
+    const timelineSeries = {{ assessment_timeline.series | tojson }};
 
     function escapeHtml(value) {
         const entities = {
@@ -232,7 +286,147 @@
         }).join("");
     }
 
+    function renderAssessmentTrend() {
+        const svg = document.getElementById("assessmentTrend");
+        const legend = document.getElementById("assessmentTrendLegend");
+        const emptyMessage = document.getElementById("assessmentTrendEmpty");
+        const validSeries = timelineSeries.filter(function (series) {
+            return series.values.some(function (value) {
+                return value !== null && Number.isFinite(Number(value));
+            });
+        });
+
+        if (!svg || !legend || !emptyMessage) {
+            return;
+        }
+
+        svg.replaceChildren();
+        legend.replaceChildren();
+        if (timelineLabels.length === 0 || validSeries.length === 0) {
+            svg.hidden = true;
+            legend.hidden = true;
+            emptyMessage.hidden = false;
+            return;
+        }
+
+        svg.hidden = false;
+        legend.hidden = false;
+        emptyMessage.hidden = true;
+        const namespace = "http://www.w3.org/2000/svg";
+        const width = 760;
+        const height = 300;
+        const margin = { top: 18, right: 20, bottom: 42, left: 48 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+        svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+
+        function addSvgElement(name, attributes, parent) {
+            const element = document.createElementNS(namespace, name);
+            Object.keys(attributes).forEach(function (key) {
+                element.setAttribute(key, attributes[key]);
+            });
+            parent.appendChild(element);
+            return element;
+        }
+
+        const title = addSvgElement("title", {}, svg);
+        title.textContent = "Published assessment score trends";
+        const description = addSvgElement("desc", {}, svg);
+        description.textContent = "Average scores from zero to one hundred for each assigned subject over published assessments.";
+
+        [0, 25, 50, 75, 100].forEach(function (tick) {
+            const y = margin.top + chartHeight * (1 - tick / 100);
+            addSvgElement("line", {
+                x1: margin.left,
+                x2: width - margin.right,
+                y1: y,
+                y2: y,
+                class: "trend-gridline"
+            }, svg);
+            const tickLabel = addSvgElement("text", {
+                x: margin.left - 10,
+                y: y + 4,
+                "text-anchor": "end",
+                class: "trend-axis-label"
+            }, svg);
+            tickLabel.textContent = String(tick);
+        });
+
+        const xFor = function (index) {
+            return margin.left + (
+                timelineLabels.length === 1
+                    ? chartWidth / 2
+                    : chartWidth * index / (timelineLabels.length - 1)
+            );
+        };
+        const yFor = function (value) {
+            return margin.top + chartHeight * (1 - Number(value) / 100);
+        };
+
+        const labelStep = Math.max(1, Math.ceil(timelineLabels.length / 6));
+        timelineLabels.forEach(function (label, index) {
+            if (index % labelStep !== 0 && index !== timelineLabels.length - 1) {
+                return;
+            }
+            const axisLabel = addSvgElement("text", {
+                x: xFor(index),
+                y: height - 12,
+                "text-anchor": "middle",
+                class: "trend-axis-label"
+            }, svg);
+            axisLabel.textContent = label;
+        });
+
+        validSeries.forEach(function (series) {
+            let pathData = "";
+            let segmentStarted = false;
+            series.values.forEach(function (value, index) {
+                if (value === null || value === undefined || value === "") {
+                    segmentStarted = false;
+                    return;
+                }
+                const command = segmentStarted ? "L" : "M";
+                pathData += command + xFor(index) + " " + yFor(value) + " ";
+                segmentStarted = true;
+            });
+            addSvgElement("path", {
+                d: pathData.trim(),
+                fill: "none",
+                stroke: series.color,
+                "stroke-width": "3",
+                "stroke-linecap": "round",
+                "stroke-linejoin": "round"
+            }, svg);
+
+            series.values.forEach(function (value, index) {
+                if (value === null || value === undefined || value === "") {
+                    return;
+                }
+                const point = addSvgElement("circle", {
+                    cx: xFor(index),
+                    cy: yFor(value),
+                    r: "4.5",
+                    fill: series.color,
+                    class: "trend-point"
+                }, svg);
+                const pointTitle = addSvgElement("title", {}, point);
+                pointTitle.textContent = series.label + ": " + value + "% on " + timelineLabels[index];
+            });
+
+            const legendItem = document.createElement("span");
+            legendItem.className = "analytics-legend-item";
+            const swatch = document.createElement("i");
+            swatch.style.backgroundColor = series.color;
+            swatch.setAttribute("aria-hidden", "true");
+            const label = document.createElement("span");
+            label.textContent = series.label;
+            legendItem.append(swatch, label);
+            legend.appendChild(legendItem);
+        });
+    }
+
     function initializeAnalytics() {
+        renderAssessmentTrend();
         renderBars(
             "attendanceBars",
             "attendanceEmpty",

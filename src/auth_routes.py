@@ -10,13 +10,54 @@ from flask import (
     session,
     url_for,
 )
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from werkzeug.security import check_password_hash
 
+from src.demo_config import (
+    DEMO_PASSWORD,
+    FACULTY_USERNAME,
+    STUDENT_USERNAME,
+    STUDENT_USERNAME_PREFIX,
+)
+from src.models import Student
 from src.portal_models import User
 
 
 auth_bp = Blueprint("auth", __name__)
+
+
+def _login_template_context():
+    """Expose only explicitly named demo accounts for the local demo picker."""
+    session_factory = current_app.config["SESSION_FACTORY"]
+    with session_factory() as db:
+        rows = db.execute(
+            select(User.username, User.role, Student.full_name)
+            .outerjoin(Student, User.student_id == Student.id)
+            .where(
+                or_(
+                    User.username == FACULTY_USERNAME,
+                    User.username == STUDENT_USERNAME,
+                    User.username.like(f"{STUDENT_USERNAME_PREFIX}%"),
+                )
+            )
+            .order_by(User.role, Student.full_name, User.username)
+        ).all()
+
+    demo_accounts = [
+        {
+            "username": row.username,
+            "label": (
+                f"{row.full_name} · Student · {row.username}"
+                if row.role == "student" and row.full_name
+                else f"Faculty workspace · {row.username}"
+            ),
+        }
+        for row in rows
+    ]
+    return {
+        "demo_accounts": demo_accounts,
+        "demo_password": DEMO_PASSWORD,
+    }
 
 
 def get_current_user():
@@ -94,7 +135,10 @@ def login():
                 user.password_hash, password
             ):
                 flash("Invalid username or password.", "error")
-                return render_template("login.html"), 401
+                return render_template(
+                    "login.html",
+                    **_login_template_context(),
+                ), 401
 
             session.clear()
             session["user_id"] = user.id
@@ -102,7 +146,7 @@ def login():
         flash("Welcome back.", "success")
         return redirect(url_for("home"))
 
-    return render_template("login.html")
+    return render_template("login.html", **_login_template_context())
 
 
 @auth_bp.route("/logout", methods=["POST"])
