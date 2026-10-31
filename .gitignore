@@ -6,3 +6,6 @@ __pycache__/
 .env.*
 !.env.example
 edupulse.db
+.portfolio-demo.sqlite
+.chrome-capture-profile/
+.portfolio-server.pid

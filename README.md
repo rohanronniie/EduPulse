@@ -1,11 +1,26 @@
 # EduPulse
-### Student Performance & Academic Analytics System
+### Explainable Academic Insights & Student Support
+
+[![Tests](https://github.com/rohanronniie/EduPulse/actions/workflows/tests.yml/badge.svg)](https://github.com/rohanronniie/EduPulse/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 EduPulse is a web application for managing student academic records and identifying areas where additional academic support may be needed. It brings attendance, assessment results, and assignment completion into one place, with explanations that show how each academic indicator was generated.
 
 Rather than treating academic performance as a black-box prediction, EduPulse uses transparent, rule-based evaluation. Faculty can review the evidence behind an indicator, explore possible interventions through a What-If simulator, and use course-level analytics to understand academic activity.
 
 The project focuses on three practical engineering concerns: **explainable evaluation, controlled access to academic information, and reliable handling of student records.**
+
+> **Portfolio demo:** the included sample cohort is fictional. EduPulse is a demonstration project, not a validated academic decision system.
+
+## Screenshots
+
+These screenshots are from the running application populated with the included synthetic demo cohort. They show real faculty dashboards, course analytics, and a student's dated subject record.
+
+| Faculty dashboard | Academic analytics | Student subject detail |
+|---|---|---|
+| [![Faculty dashboard](docs/images/faculty-dashboard.png)](docs/images/faculty-dashboard.png) | [![Academic analytics](docs/images/analytics-dashboard.png)](docs/images/analytics-dashboard.png) | [![Student subject detail](docs/images/student-subject-detail.png)](docs/images/student-subject-detail.png) |
+
+To explore the same workflows locally, follow [Getting started](#getting-started) and the demo account instructions below.
 
 ## Features
 
@@ -28,6 +43,7 @@ Faculty can explore hypothetical changes to attendance, assessment scores, and a
 - Faculty access to assigned courses, attendance management, assessment creation, marks entry, and result publishing.
 - Attendance sessions can be reopened and corrected; recording the same course, date, and topic updates the existing session.
 - Student access to their academic information and published assessment results.
+- Subject pages group published marks with dated attendance history.
 - Access restrictions that prevent students from opening faculty-only pages.
 - Attendance and assessment workflows tied to course enrollment.
 
@@ -57,11 +73,12 @@ Academic reports show where their inputs come from. The saved-record report uses
 |---|---|
 | Language | Python |
 | Web framework | Flask |
-| Database | SQLite |
+| Database | SQLite for local use; PostgreSQL connection support |
 | Database toolkit | SQLAlchemy |
 | Frontend | HTML, CSS, JavaScript, Jinja |
 | Security | Flask-WTF, session-based authentication |
 | Testing | pytest |
+| Production server | Waitress |
 | Version control | Git, GitHub |
 
 ## How the evaluation works
@@ -89,6 +106,7 @@ EduPulse/
 ├── src/
 │   ├── __init__.py
 │   ├── database.py
+│   ├── demo_config.py
 │   ├── models.py
 │   ├── academic_models.py
 │   ├── academic_engine.py
@@ -103,9 +121,17 @@ EduPulse/
 │   ├── assessment_routes.py
 │   ├── analytics_routes.py
 │   ├── templates/
+│   │   └── student_course_detail.html
 │   └── static/
+├── .github/
+│   └── workflows/
+│       └── tests.yml
+├── docs/
+│   ├── images/
+│   └── PROJECT_BRIEF.md
 ├── tests/
 ├── Dockerfile
+├── LICENSE
 ├── Procfile
 ├── requirements.txt
 ├── run.py
@@ -179,6 +205,8 @@ python seed_demo.py
 
 The seed is idempotent for its demo records and updates demo account passwords. It does not delete unrelated records. It creates one faculty account and an individual student login for each fictional profile. Use `faculty.demo` for the faculty workspace; student logins are `sd.1` through `sd.8`, and the sign-in page lists them after seeding. All demo accounts use the short shared password `Demo123!`. Use the seed only with a disposable or explicitly chosen demonstration database, never with institutional data or a deployed database. These shared demo credentials must not be used in a deployment.
 
+After seeding, the sign-in page lets a reviewer select an account and signs in with one click. To test student-specific views, choose different `sd.*` accounts; the faculty account opens course management, marks, analytics, and support follow-ups.
+
 ### 7. Run the tests
 
 Stop the development server if necessary, then run:
@@ -194,6 +222,8 @@ Run the suite again after making changes; the result above records the latest ve
 ## Testing and verification
 
 The test suite covers academic evaluation, input validation, database operations, authentication-related workflows, attendance, assessments, marks, and application routes.
+
+The complete test command is `python -m pytest -q`. Tests use isolated databases and do not require the demonstration seed.
 
 The `/health` endpoint checks both the application and its configured database connection and returns a service-unavailable response if the database cannot be reached.
 

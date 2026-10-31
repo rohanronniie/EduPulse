@@ -24,7 +24,7 @@ EduPulse aims to connect academic trends, transparent alerts, and intervention t
 4. Explainable, rule-based academic risk alerts.
 5. A what-if simulator for hypothetical changes to selected inputs.
 6. Intervention records and follow-up tracking.
-7. An academic analytics dashboard and report export.
+7. Role-specific dashboards with visual analytics and student subject details.
 
 ## 5. Differentiating Feature
 
@@ -62,7 +62,7 @@ If a predictive model is introduced, it will be evaluated separately using suita
 
 ## 9. Current Scope
 
-The application now includes role-based faculty/student portals, course and enrollment management, attendance and assessment entry, published results, explainable academic indicators, a what-if simulator, faculty analytics, and support follow-up tracking.
+The application now includes role-based faculty/student portals, course and enrollment management, editable attendance sessions, assessment entry and publishing, student subject pages with dated attendance history, explainable academic indicators, a what-if simulator, visual analytics, and support follow-up tracking.
 
 Local development uses SQLite. A PostgreSQL connection option, production WSGI entry point, container recipe, health check, and production cookie/security settings are prepared for a deployment chosen by the project owner.
 
