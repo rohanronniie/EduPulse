@@ -7,12 +7,17 @@
 <section class="page-header">
     <h1>Student Enrollments</h1>
     <p>View which students are associated with each course.</p>
-    <a href="{{ url_for('enrollment.create_enrollment') }}">Enroll Student</a>
+    <a class="button" href="{{ url_for('enrollment.create_enrollment') }}">Add enrollment</a>
 </section>
 
 <section class="panel">
     {% if enrollments %}
-        <table>
+        <label class="table-search" for="enrollmentFilter">
+            <span>Find an enrollment</span>
+            <input id="enrollmentFilter" type="search" data-table-filter="enrollmentDirectory" placeholder="Search by student or course">
+        </label>
+        <div class="table-wrapper">
+        <table class="management-table" id="enrollmentDirectory">
             <thead>
                 <tr>
                     <th>Student Code</th>
@@ -20,6 +25,7 @@
                     <th>Course Code</th>
                     <th>Course Title</th>
                     <th>Enrolled At</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -30,12 +36,26 @@
                         <td>{{ enrollment.course.course_code }}</td>
                         <td>{{ enrollment.course.title }}</td>
                         <td>{{ enrollment.enrolled_at.strftime('%d %b %Y') }}</td>
+                        <td>
+                            <form method="post" class="row-action-form"
+                                  action="{{ url_for('enrollment.delete_enrollment', enrollment_id=enrollment.id) }}"
+                                  data-confirm="Remove {{ enrollment.student.student_code }} from {{ enrollment.course.course_code }}? This is allowed only when no academic history or follow-up is attached.">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="button button-danger" type="submit">Remove</button>
+                            </form>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
+        </div>
+        <p class="filter-empty" data-filter-empty="enrollmentDirectory" hidden>No enrollments match this search.</p>
     {% else %}
-        <p>No enrollments yet. Create an enrollment to get started.</p>
+        <div class="empty-state">
+            <h2>No enrollments yet</h2>
+            <p>Enroll a student in a course to get started.</p>
+            <a class="button" href="{{ url_for('enrollment.create_enrollment') }}">Add enrollment</a>
+        </div>
     {% endif %}
 </section>
 {% endblock %}

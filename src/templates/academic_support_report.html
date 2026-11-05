@@ -10,8 +10,9 @@
         <h1>Support workspace</h1>
         <p>{{ course.title }} · Review signals and record timely follow-up.</p>
         <p class="report-disclaimer">
-            Attendance and published assessment results are live portal data.
-            Assignment completion comes from saved academic records; if none
+            This report uses live attendance entries and published portal marks.
+            Saved attendance and assessment values are not used as fallbacks here.
+            Assignment completion comes from the saved academic record; if none
             exists, the existing 0 of 0 fallback is used.
         </p>
     </div>
@@ -159,8 +160,9 @@
         </section>
     {% endfor %}
 {% else %}
-    <section class="card">
-        <p>No students are currently enrolled in this course.</p>
+    <section class="card empty-state" role="status">
+        <h2>No students enrolled</h2>
+        <p>Add enrollments to see course support indicators and follow-up records.</p>
     </section>
 {% endif %}
 {% endblock %}

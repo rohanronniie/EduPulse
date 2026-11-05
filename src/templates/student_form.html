@@ -1,14 +1,14 @@
 
 {% extends "base.html" %}
 
-{% block title %}Add Student | EduPulse{% endblock %}
-{% block topbar_title %}Student Registration{% endblock %}
+{% block title %}{{ 'Edit Student' if student else 'Add Student' }} | EduPulse{% endblock %}
+{% block topbar_title %}{{ 'Edit Student' if student else 'Student Registration' }}{% endblock %}
 
 {% block content %}
 <div class="page-heading">
     <div>
-        <h1>Register a Student</h1>
-        <p>Add a student to the EduPulse academic records system.</p>
+        <h1>{{ 'Edit Student' if student else 'Register a Student' }}</h1>
+        <p>{{ 'Update directory details; linked academic records remain attached.' if student else 'Add a student to the EduPulse academic records system.' }}</p>
     </div>
 </div>
 
@@ -18,7 +18,7 @@
         Enter the student's identifying information below.
     </p>
 
-    <form method="post">
+    <form method="post" action="{{ url_for('students.edit_student', student_id=student.id) if student else url_for('students.create_student') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label for="student_code">Student Code</label>
@@ -30,6 +30,7 @@
                 maxlength="30"
                 placeholder="e.g. AIML001"
                 autocomplete="off"
+                value="{{ student.student_code if student else '' }}"
                 required
             >
             <p class="form-help">
@@ -47,13 +48,14 @@
                 maxlength="100"
                 placeholder="Enter the student's full name"
                 autocomplete="name"
+                value="{{ student.full_name if student else '' }}"
                 required
             >
         </div>
 
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">
-                Register Student
+                {{ 'Save changes' if student else 'Register Student' }}
             </button>
 
             <a

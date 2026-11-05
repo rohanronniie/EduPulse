@@ -1,12 +1,12 @@
 
 import pytest
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.database import Base
+from src.database import Base, ensure_attendance_date_integrity
 from src.models import Course, Student, StudentCourse
 
 
@@ -33,6 +33,53 @@ def create_test_session():
     )
 
     return TestSession()
+
+
+def create_legacy_attendance_engine():
+    """Create the pre-constraint attendance schema used by the upgrade tests."""
+    test_engine = create_engine("sqlite://")
+    with test_engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE attendance_sessions ("
+            "id INTEGER PRIMARY KEY, course_id INTEGER NOT NULL, "
+            "session_date DATE NOT NULL)"
+        )
+    return test_engine
+
+
+def test_attendance_integrity_upgrade_adds_index_to_clean_legacy_table():
+    test_engine = create_legacy_attendance_engine()
+    try:
+        ensure_attendance_date_integrity(test_engine)
+
+        indexes = inspect(test_engine).get_indexes("attendance_sessions")
+        assert any(
+            index["name"] == "uq_attendance_sessions_course_date_guard"
+            and index["unique"]
+            for index in indexes
+        )
+    finally:
+        test_engine.dispose()
+
+
+def test_attendance_integrity_upgrade_preserves_legacy_duplicates(caplog):
+    test_engine = create_legacy_attendance_engine()
+    try:
+        with test_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO attendance_sessions (course_id, session_date) "
+                "VALUES (3, '2026-10-27'), (3, '2026-10-27')"
+            )
+
+        ensure_attendance_date_integrity(test_engine)
+
+        assert not any(
+            index["name"] == "uq_attendance_sessions_course_date_guard"
+            for index in inspect(test_engine).get_indexes("attendance_sessions")
+        )
+        assert "legacy duplicate sessions exist" in caplog.text
+    finally:
+        test_engine.dispose()
 
 
 def test_student_can_be_created():

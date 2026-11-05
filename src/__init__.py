@@ -192,6 +192,7 @@ def create_app(test_config=None):
                         Assessment.course_id,
                         Course.title.label("course_title"),
                         Assessment.assessment_date,
+                        Assessment.id.label("assessment_id"),
                     )
                     .join(
                         AssessmentMark,
@@ -202,7 +203,10 @@ def create_app(test_config=None):
                         AssessmentMark.student_id == student_id,
                         Assessment.published.is_(True),
                     )
-                    .order_by(Assessment.assessment_date.desc())
+                    .order_by(
+                        Assessment.assessment_date.desc(),
+                        Assessment.id.desc(),
+                    )
                 ).all()
 
                 marks_by_course = {}
@@ -218,6 +222,8 @@ def create_app(test_config=None):
                             "marks": mark.marks,
                             "max_marks": mark.max_marks,
                             "percentage": score_percentage,
+                            "assessment_date": mark.assessment_date,
+                            "assessment_id": mark.assessment_id,
                         }
                     )
 
@@ -240,6 +246,20 @@ def create_app(test_config=None):
                             "assessment_marks": marks_by_course.get(
                                 course.id,
                                 [],
+                            ),
+                            "assessment_average": (
+                                round(
+                                    sum(
+                                        mark["percentage"]
+                                        for mark in marks_by_course.get(
+                                            course.id, []
+                                        )
+                                    )
+                                    / len(marks_by_course[course.id]),
+                                    1,
+                                )
+                                if marks_by_course.get(course.id)
+                                else None
                             ),
                         }
                     )

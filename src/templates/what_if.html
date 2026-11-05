@@ -8,13 +8,21 @@
     <h1>What-If Simulator</h1>
     <p>{{ data.student_name }} — {{ data.course_code }}: {{ data.course_title }}</p>
     <p>Explore hypothetical changes without modifying the saved academic record.</p>
+    <div class="data-sources what-if-sources" aria-label="Current scenario data sources">
+        <h2>Current scenario data</h2>
+        <ul>
+            <li><strong>Attendance:</strong> {{ data.attendance_source }}</li>
+            <li><strong>Assessment scores:</strong> {{ data.assessment_source }}</li>
+            <li><strong>Assignments:</strong> {{ data.assignment_source }}</li>
+        </ul>
+    </div>
 </section>
 
-<section class="panel">
+<section class="card what-if-panel">
     <h2>Hypothetical academic data</h2>
 
     {% if error %}
-        <p role="alert">{{ error }}</p>
+        <p class="inline-notice inline-notice-warning" role="alert">{{ error }}</p>
     {% endif %}
 
     <form method="POST">
@@ -56,7 +64,7 @@
 
 {% if result %}
 
-<section class="panel">
+<section class="card what-if-panel what-if-results">
     <h2>Comparison Results</h2>
 
     <div class="comparison-grid">

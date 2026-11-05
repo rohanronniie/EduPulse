@@ -18,6 +18,14 @@
 
 <section class="card attendance-sessions-card">
     {% if sessions %}
+        {% if duplicate_dates %}
+            <p class="inline-notice inline-notice-warning" role="status">
+                More than one saved session exists for
+                {% for duplicate_date in duplicate_dates|sort %}
+                    {{ duplicate_date.strftime('%d %b %Y') }}{% if not loop.last %}, {% endif %}
+                {% endfor %}. Review each saved row before recording a new session for that date.
+            </p>
+        {% endif %}
         <div class="table-wrapper">
             <table class="data-table attendance-sessions-table">
                 <thead>

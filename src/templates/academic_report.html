@@ -8,9 +8,10 @@
     <p class="report-disclaimer">This report applies configurable rules to the recorded data. It is not a validated prediction of academic outcomes.</p>
 </section>
 
-<section class="panel">
+<section class="card academic-report-card">
     <div class="data-sources" aria-label="Data used in this report">
         <h2>Data used</h2>
+        <p>Live attendance and published marks take precedence when available. Saved attendance and assessment values are used only when their corresponding live data is absent.</p>
         <ul>
             <li><strong>Attendance:</strong> {{ data.attendance_source }}</li>
             <li><strong>Assessment scores:</strong> {{ data.assessment_source }}</li>
@@ -19,9 +20,13 @@
     </div>
     <h2>Overall status: {{ report.overall_status|replace('_', ' ')|title }}</h2>
     {% for rule_name, finding in report.findings.items() %}
-        <article>
-            <h3>{{ rule_name|replace('_', ' ')|title }}</h3>
-            <p><strong>Status:</strong> {{ finding.status|replace('_', ' ')|title }}</p>
+        <article class="finding">
+            <h4>
+                {{ rule_name|replace('_', ' ')|title }}
+                <span class="finding-status finding-{{ finding.status }}">
+                    {{ finding.status|replace('_', ' ')|title }}
+                </span>
+            </h4>
             <p>{{ finding.reason }}</p>
         </article>
     {% endfor %}
@@ -34,7 +39,7 @@
     </p>
 </section>
 
-<section class="panel">
+<section class="card academic-report-card">
     <h2>Suggested follow-up actions</h2>
     {% if interventions.recommendations %}
         <ul>

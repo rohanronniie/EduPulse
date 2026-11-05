@@ -65,6 +65,13 @@ class AttendanceSession(Base):
     """A single class session for a course."""
 
     __tablename__ = "attendance_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "course_id",
+            "session_date",
+            name="uq_attendance_course_date",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     course_id: Mapped[int] = mapped_column(

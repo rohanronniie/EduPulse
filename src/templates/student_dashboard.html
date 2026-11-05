@@ -12,11 +12,13 @@
 
 <section class="dashboard-grid">
     <article class="card">
+        <span class="stat-icon" aria-hidden="true"><svg><use href="#icon-courses"/></svg></span>
         <p class="stat-label">Enrolled Subjects</p>
         <h2>{{ courses|length }}</h2>
     </article>
 
     <article class="card">
+        <span class="stat-icon" aria-hidden="true"><svg><use href="#icon-attendance"/></svg></span>
         <p class="stat-label">Attendance</p>
         <h2>
             {% if attendance_percentage is not none %}
@@ -29,6 +31,7 @@
     </article>
 
     <article class="card">
+        <span class="stat-icon" aria-hidden="true"><svg><use href="#icon-assessments"/></svg></span>
         <p class="stat-label">Published Assessments</p>
         <h2>{{ published_marks|length }}</h2>
     </article>
@@ -77,38 +80,67 @@
         <div class="chart-heading">
             <div>
                 <p class="eyebrow">PUBLISHED RESULTS</p>
-                <h2>Assessment scores</h2>
+                <h2>Average score by subject</h2>
             </div>
-            <span class="chart-unit">Score · %</span>
+            <span class="chart-unit">Published marks · percentage</span>
         </div>
-        {% if published_marks %}
-        <div class="metric-bar-list">
-            {% for mark in student_course_analytics %}
-                {% for score in mark.assessment_marks %}
-                <div class="metric-bar-item">
-                    <div class="metric-bar-heading">
-                        <span>{{ score.course_title }} · {{ score.title }}</span>
-                        <strong>{{ score.percentage }}%</strong>
-                    </div>
-                    <div class="metric-bar-track" role="progressbar"
-                         aria-label="{{ score.course_title }} {{ score.title }} score"
-                         aria-valuemin="0" aria-valuemax="100"
-                         aria-valuenow="{{ score.percentage }}">
-                        <span class="metric-bar-fill metric-bar-score"
-                              style="width: {{ score.percentage }}%"></span>
-                    </div>
-                    <small>{{ score.marks }} / {{ score.max_marks }} marks</small>
-                </div>
-                {% endfor %}
-            {% endfor %}
+        {% set score_available = namespace(value=false) %}
+        {% for item in student_course_analytics %}
+            {% if item.assessment_average is not none %}{% set score_available.value = true %}{% endif %}
+        {% endfor %}
+        <div class="student-results-chart-wrap">
+            <svg id="assessmentAverageChart" class="student-results-chart" role="img" aria-label="Average published assessment percentage by subject"></svg>
         </div>
-        {% else %}
-        <p class="chart-empty-state">Published assessment scores will appear here when your instructors release results.</p>
-        {% endif %}
+        <p id="assessmentAverageEmpty" class="chart-empty-state" {% if score_available.value %}hidden{% endif %}>
+            Published assessment averages will appear here when results are released.
+        </p>
     </article>
 </section>
 
-<section class="student-subject-section">
+<section class="card student-results-card" aria-labelledby="assessment-results-title">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">PUBLISHED RESULTS</p>
+            <h2 id="assessment-results-title">Assessment results</h2>
+            <p>Scores are grouped by subject and shown as obtained marks and percentage.</p>
+        </div>
+        <span>{{ published_marks|length }} result(s)</span>
+    </div>
+    {% if published_marks %}
+    <div class="table-wrapper">
+        <table class="data-table student-results-table">
+            <thead>
+                <tr><th>Assessment</th><th>Date</th><th>Marks obtained</th><th>Maximum</th><th>Percentage</th></tr>
+            </thead>
+            <tbody>
+                {% for item in student_course_analytics %}
+                    {% if item.assessment_marks %}
+                    <tr class="course-group-row">
+                        <th colspan="5" scope="rowgroup">{{ item.course.course_code }} &middot; {{ item.course.title }}</th>
+                    </tr>
+                    {% for score in item.assessment_marks %}
+                    <tr>
+                        <td>{{ score.title }}</td>
+                        <td>{{ score.assessment_date.strftime('%d %b %Y') }}</td>
+                        <td class="score-cell">{{ score.marks }}</td>
+                        <td class="score-cell">{{ score.max_marks }}</td>
+                        <td class="percentage-cell"><span class="score-indicator">{{ score.percentage }}%</span></td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" role="status">
+        <h3>No published results yet</h3>
+        <p>Assessment results will appear here after your instructors publish them.</p>
+    </div>
+    {% endif %}
+</section>
+
+<section class="student-subject-section" id="subjects">
     <div class="section-heading student-subject-heading">
         <div>
             <p class="eyebrow">YOUR COURSEWORK</p>
@@ -143,12 +175,7 @@
                 <span style="width: {{ item.attendance_percentage }}%"></span>
             </div>
             {% endif %}
-            {% if item.assessment_marks %}
-                {% set latest_mark = item.assessment_marks[0] %}
-                <p class="student-course-latest">Latest result <strong>{{ latest_mark.marks }} / {{ latest_mark.max_marks }}</strong></p>
-            {% else %}
-                <p class="student-course-latest">No results released yet</p>
-            {% endif %}
+            <p class="student-course-latest">{{ item.assessment_marks|length }} published result(s)</p>
             <span class="student-course-action">View subject details <span aria-hidden="true">→</span></span>
         </a>
         {% endfor %}
@@ -160,4 +187,61 @@
     </div>
     {% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const svg = document.getElementById("assessmentAverageChart");
+    const empty = document.getElementById("assessmentAverageEmpty");
+    const labels = {{ student_course_analytics | map(attribute='course.title') | list | tojson }};
+    const values = {{ student_course_analytics | map(attribute='assessment_average') | list | tojson }};
+    if (!svg || !empty) return;
+    const rows = labels.map((label, index) => ({label, value: values[index]}))
+        .filter((row) => row.value !== null && Number.isFinite(Number(row.value)));
+    if (!rows.length) {
+        svg.hidden = true;
+        empty.hidden = false;
+        return;
+    }
+    empty.hidden = true;
+    svg.hidden = false;
+    const ns = "http://www.w3.org/2000/svg";
+    const width = 860;
+    const height = Math.max(230, rows.length * 52 + 62);
+    const left = 245;
+    const right = 45;
+    const chartWidth = width - left - right;
+    const rowHeight = (height - 52) / rows.length;
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    const add = (name, attrs, parent = svg) => {
+        const node = document.createElementNS(ns, name);
+        Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+        parent.appendChild(node);
+        return node;
+    };
+    const title = add("title", {});
+    title.textContent = "Average published assessment percentage by subject";
+    const desc = add("desc", {});
+    desc.textContent = "Each bar compares the student's average published percentage for one subject, on a zero to one hundred scale.";
+    [0, 25, 50, 75, 100].forEach((tick) => {
+        const x = left + chartWidth * tick / 100;
+        add("line", {x1: x, x2: x, y1: 14, y2: height - 28, class: "student-chart-gridline"});
+        const label = add("text", {x, y: height - 7, "text-anchor": "middle", class: "student-chart-axis"});
+        label.textContent = `${tick}%`;
+    });
+    rows.forEach((row, index) => {
+        const value = Math.max(0, Math.min(100, Number(row.value)));
+        const y = 22 + index * rowHeight;
+        const courseLabel = add("text", {x: left - 14, y: y + 20, "text-anchor": "end", class: "student-chart-label"});
+        courseLabel.textContent = row.label;
+        add("rect", {x: left, y, width: chartWidth, height: 26, rx: 6, class: "student-chart-track"});
+        const bar = add("rect", {x: left, y, width: chartWidth * value / 100, height: 26, rx: 6, class: "student-chart-bar"});
+        const tip = add("title", {}, bar);
+        tip.textContent = `${row.label}: ${value.toFixed(1)}% average`;
+        const amount = add("text", {x: value > 92 ? width - 8 : left + chartWidth * value / 100 + 10, y: y + 19, "text-anchor": value > 92 ? "end" : "start", class: "student-chart-value"});
+        amount.textContent = `${value.toFixed(1)}%`;
+    });
+})();
+</script>
 {% endblock %}

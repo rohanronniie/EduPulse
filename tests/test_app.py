@@ -3,6 +3,7 @@ import re
 import pytest
 
 from sqlalchemy import create_engine, event, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from werkzeug.security import generate_password_hash
@@ -187,7 +188,7 @@ def login_as_student(client, test_engine):
     )
 
 
-def test_csrf_protect_rejects_missing_and_invalid_tokens():
+def test_csrf_protect_rejects_missing_token():
     app, test_engine = create_test_app()
     app.config["WTF_CSRF_ENABLED"] = True
 
@@ -200,7 +201,18 @@ def test_csrf_protect_rejects_missing_and_invalid_tokens():
                 "password": "TestFaculty@2026",
             },
         )
-        invalid_token = client.post(
+
+        assert missing_token.status_code == 400
+    finally:
+        test_engine.dispose()
+
+
+def test_csrf_protect_rejects_invalid_token():
+    app, test_engine = create_test_app()
+    app.config["WTF_CSRF_ENABLED"] = True
+
+    try:
+        invalid_token = app.test_client().post(
             "/login",
             data={
                 "username": "faculty.test",
@@ -209,8 +221,17 @@ def test_csrf_protect_rejects_missing_and_invalid_tokens():
             },
         )
 
-        assert missing_token.status_code == 400
         assert invalid_token.status_code == 400
+    finally:
+        test_engine.dispose()
+
+
+def test_csrf_protect_accepts_valid_token():
+    app, test_engine = create_test_app()
+    app.config["WTF_CSRF_ENABLED"] = True
+
+    try:
+        client = app.test_client()
 
         import re
 
@@ -234,7 +255,7 @@ def test_csrf_protect_rejects_missing_and_invalid_tokens():
         test_engine.dispose()
 
 
-def test_attendance_can_edit_existing_session_and_record_another_topic():
+def test_attendance_requires_explicit_edit_and_rejects_duplicate_course_date():
     app, test_engine = create_test_app()
 
     try:
@@ -275,25 +296,54 @@ def test_attendance_can_edit_existing_session_and_record_another_topic():
                     AttendanceSession.course_id == course_id
                 )
             )
-        update = client.post(
+        accidental_duplicate = client.post(
             f"/attendance/course/{course_id}",
             data={**post_data, f"status_{student_id}": "absent"},
+        )
+        with sessionmaker(bind=test_engine)() as session:
+            existing_entry = session.scalar(select(AttendanceEntry))
+            assert existing_entry.status == "present"
+
+        update = client.post(
+            f"/attendance/course/{course_id}",
+            data={
+                **post_data,
+                "session_id": str(recorded_session_id),
+                f"status_{student_id}": "absent",
+            },
         )
         edit_page = client.get(
             f"/attendance/course/{course_id}?session_id={recorded_session_id}"
         )
-        another_topic = client.post(
+        another_date = client.post(
             f"/attendance/course/{course_id}",
-            data={**post_data, "topic": "Transactions"},
+            data={
+                **post_data,
+                "session_date": "2026-10-31",
+                "topic": "Transactions",
+            },
+        )
+        conflicting_edit = client.post(
+            f"/attendance/course/{course_id}",
+            data={
+                **post_data,
+                "session_id": str(recorded_session_id),
+                "session_date": "2026-10-31",
+            },
         )
 
         assert first.status_code == 302
+        assert accidental_duplicate.status_code == 302
+        assert accidental_duplicate.headers["Location"].endswith(
+            f"/attendance/course/{course_id}/sessions"
+        )
         assert update.status_code == 302
         assert edit_page.status_code == 200
         assert b"Edit Attendance" in edit_page.data
         assert b'value="Database design"' in edit_page.data
         assert b'value="absent" selected' in edit_page.data
-        assert another_topic.status_code == 302
+        assert another_date.status_code == 302
+        assert conflicting_edit.status_code == 302
 
         sessions_page = client.get(
             f"/attendance/course/{course_id}/sessions"
@@ -309,13 +359,13 @@ def test_attendance_can_edit_existing_session_and_record_another_topic():
                 )
             ).all()
             assert len(sessions) == 2
-            attendance_by_topic = {
-                item.topic: item for item in sessions
-            }
+            original = next(
+                item for item in sessions
+                if item.session_date == date(2026, 10, 30)
+            )
             original_entry = session.scalar(
                 select(AttendanceEntry).where(
-                    AttendanceEntry.session_id
-                    == attendance_by_topic["Database design"].id,
+                    AttendanceEntry.session_id == original.id,
                     AttendanceEntry.student_id == student_id,
                 )
             )
@@ -323,9 +373,75 @@ def test_attendance_can_edit_existing_session_and_record_another_topic():
             assert session.scalar(
                 select(AttendanceEntry.id).where(
                     AttendanceEntry.session_id
-                    == attendance_by_topic["Transactions"].id
+                    == next(
+                        item
+                        for item in sessions
+                        if item.session_date == date(2026, 10, 31)
+                    ).id
                 )
             ) is not None
+    finally:
+        test_engine.dispose()
+
+
+def test_database_rejects_duplicate_attendance_course_date():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            faculty = session.scalar(
+                select(User).where(User.username == "faculty.test")
+            )
+            course = Course(
+                course_code="UNQ101",
+                title="Unique Attendance Course",
+            )
+            session.add(course)
+            session.flush()
+            session.add(
+                AttendanceSession(
+                    course_id=course.id,
+                    faculty_id=faculty.id,
+                    session_date=date(2026, 10, 30),
+                    topic="First class",
+                )
+            )
+            session.commit()
+
+            session.add(
+                AttendanceSession(
+                    course_id=course.id,
+                    faculty_id=faculty.id,
+                    session_date=date(2026, 10, 30),
+                    topic="Different topic, same date",
+                )
+            )
+            with pytest.raises(IntegrityError):
+                session.commit()
+    finally:
+        test_engine.dispose()
+
+
+def test_faculty_cannot_view_attendance_or_support_for_unassigned_course():
+    app, test_engine = create_test_app()
+
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            unassigned_course = Course(
+                course_code="OTHER201",
+                title="Another Faculty Course",
+            )
+            session.add(unassigned_course)
+            session.commit()
+            course_id = unassigned_course.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+
+        attendance = client.get(f"/attendance/course/{course_id}/sessions")
+        support_report = client.get(f"/academic-support/{course_id}")
+
+        assert attendance.status_code == 404
+        assert support_report.status_code == 404
     finally:
         test_engine.dispose()
 
@@ -372,12 +488,12 @@ def test_production_configuration_marks_auth_cookies_secure(monkeypatch):
         {
             "TESTING": True,
             "INITIALIZE_DATABASE": False,
-            "WTF_CSRF_ENABLED": False,
             "SECRET_KEY": "test-secret",
         }
     )
 
     assert app.config["SESSION_COOKIE_SECURE"] is True
+    assert app.config["WTF_CSRF_ENABLED"] is True
     response = app.test_client().get("/health")
     assert response.status_code == 200
     assert "max-age=31536000" in response.headers["Strict-Transport-Security"]
@@ -465,6 +581,411 @@ def test_duplicate_student_registration_is_rejected():
 
         assert second_response.status_code == 409
         assert b"student code already exists" in second_response.data
+    finally:
+        test_engine.dispose()
+
+
+def test_faculty_can_delete_unreferenced_student():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(
+                student_code="DEL001",
+                full_name="Delete Student",
+            )
+            session.add(student)
+            session.commit()
+            student_id = student.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        response = client.post(f"/students/{student_id}/delete")
+
+        assert response.status_code == 302
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(Student, student_id) is None
+    finally:
+        test_engine.dispose()
+
+
+def test_faculty_can_edit_student_and_course_without_detaching_history():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(student_code="EDIT001", full_name="Before Name")
+            course = Course(course_code="EDT101", title="Before Course")
+            session.add_all([student, course])
+            session.flush()
+            enrollment = StudentCourse(
+                student_id=student.id,
+                course_id=course.id,
+            )
+            session.add(enrollment)
+            session.flush()
+            record = AcademicRecord(
+                student_course_id=enrollment.id,
+                attendance_percentage=81,
+                assessment_scores=[77],
+                completed_assignments=2,
+                total_assignments=3,
+            )
+            session.add(record)
+            session.commit()
+            student_id = student.id
+            course_id = course.id
+            record_id = record.id
+            enrollment_id = enrollment.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        student_response = client.post(
+            f"/students/{student_id}/edit",
+            data={"student_code": "EDIT002", "full_name": "After Name"},
+        )
+        course_response = client.post(
+            f"/courses/{course_id}/edit",
+            data={"course_code": "EDT102", "title": "After Course"},
+        )
+
+        assert student_response.status_code == 302
+        assert course_response.status_code == 302
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(Student, student_id).full_name == "After Name"
+            assert session.get(Course, course_id).title == "After Course"
+            assert session.get(AcademicRecord, record_id) is not None
+            assert session.get(StudentCourse, enrollment_id) is not None
+    finally:
+        test_engine.dispose()
+
+
+def test_student_delete_is_blocked_when_enrollment_has_academic_history():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(student_code="DEL002", full_name="Protected Student")
+            course = Course(course_code="DEL101", title="Protected Course")
+            session.add_all([student, course])
+            session.flush()
+            enrollment = StudentCourse(
+                student_id=student.id,
+                course_id=course.id,
+            )
+            session.add(enrollment)
+            session.flush()
+            session.add(
+                AcademicRecord(
+                    student_course_id=enrollment.id,
+                    attendance_percentage=72,
+                    assessment_scores=[65],
+                    completed_assignments=3,
+                    total_assignments=4,
+                )
+            )
+            session.commit()
+            student_id = student.id
+            enrollment_id = enrollment.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        response = client.post(f"/students/{student_id}/delete", follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b"cannot be deleted" in response.data
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(Student, student_id) is not None
+            assert session.scalar(
+                select(AcademicRecord.id).where(
+                    AcademicRecord.student_course_id == enrollment_id
+                )
+            ) is not None
+    finally:
+        test_engine.dispose()
+
+
+def test_course_delete_is_blocked_without_cascading_attendance_or_assessments():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            faculty = session.scalar(
+                select(User).where(User.username == "faculty.test")
+            )
+            course = Course(course_code="DEL102", title="Course with history")
+            session.add(course)
+            session.flush()
+            attendance = AttendanceSession(
+                course_id=course.id,
+                faculty_id=faculty.id,
+                session_date=date(2026, 10, 25),
+                topic="Recorded session",
+            )
+            assessment = Assessment(
+                course_id=course.id,
+                faculty_id=faculty.id,
+                title="Published assessment",
+                max_marks=100,
+                assessment_date=date(2026, 10, 26),
+                published=True,
+            )
+            session.add_all([attendance, assessment])
+            session.commit()
+            course_id = course.id
+            attendance_id = attendance.id
+            assessment_id = assessment.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        response = client.post(f"/courses/{course_id}/delete", follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b"cannot be deleted" in response.data
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(Course, course_id) is not None
+            assert session.get(AttendanceSession, attendance_id) is not None
+            assert session.get(Assessment, assessment_id) is not None
+    finally:
+        test_engine.dispose()
+
+
+def test_faculty_can_delete_unreferenced_course_and_assignment():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            faculty = session.scalar(
+                select(User).where(User.username == "faculty.test")
+            )
+            course = Course(course_code="DEL104", title="Unused Course")
+            session.add(course)
+            session.flush()
+            assignment = FacultyCourse(
+                faculty_id=faculty.id,
+                course_id=course.id,
+            )
+            session.add(assignment)
+            session.commit()
+            course_id = course.id
+            assignment_id = assignment.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        response = client.post(f"/courses/{course_id}/delete")
+
+        assert response.status_code == 302
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(Course, course_id) is None
+            assert session.get(FacultyCourse, assignment_id) is None
+    finally:
+        test_engine.dispose()
+
+
+def test_faculty_can_remove_enrollment_without_academic_history():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(student_code="DEL003", full_name="Enrollment Student")
+            course = Course(course_code="DEL103", title="Empty Enrollment Course")
+            session.add_all([student, course])
+            session.flush()
+            enrollment = StudentCourse(
+                student_id=student.id,
+                course_id=course.id,
+            )
+            session.add(enrollment)
+            session.commit()
+            enrollment_id = enrollment.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        response = client.post(f"/enrollments/{enrollment_id}/delete")
+
+        assert response.status_code == 302
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(StudentCourse, enrollment_id) is None
+    finally:
+        test_engine.dispose()
+
+
+def test_enrollment_removal_is_blocked_when_academic_record_exists():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(student_code="DEL006", full_name="History Student")
+            course = Course(course_code="DEL106", title="History Course")
+            session.add_all([student, course])
+            session.flush()
+            enrollment = StudentCourse(
+                student_id=student.id,
+                course_id=course.id,
+            )
+            session.add(enrollment)
+            session.flush()
+            record = AcademicRecord(
+                student_course_id=enrollment.id,
+                attendance_percentage=80,
+                assessment_scores=[75],
+                completed_assignments=2,
+                total_assignments=3,
+            )
+            session.add(record)
+            session.commit()
+            enrollment_id = enrollment.id
+            record_id = record.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        response = client.post(
+            f"/enrollments/{enrollment_id}/delete",
+            follow_redirects=True,
+        )
+
+        assert response.status_code == 200
+        assert b"cannot be removed" in response.data
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(StudentCourse, enrollment_id) is not None
+            assert session.get(AcademicRecord, record_id) is not None
+    finally:
+        test_engine.dispose()
+
+
+def test_student_cannot_delete_a_student_record():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(student_code="DEL004", full_name="Protected Target")
+            session.add(student)
+            session.commit()
+            student_id = student.id
+
+        client = app.test_client()
+        login_as_student(client, test_engine)
+        response = client.post(f"/students/{student_id}/delete")
+
+        assert response.status_code == 302
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(Student, student_id) is not None
+    finally:
+        test_engine.dispose()
+
+
+def test_student_delete_requires_valid_csrf_token():
+    app, test_engine = create_test_app()
+    app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(student_code="DEL005", full_name="CSRF Student")
+            session.add(student)
+            session.commit()
+            student_id = student.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        target = f"/students/{student_id}/delete"
+        missing = client.post(target)
+        invalid = client.post(target, data={"csrf_token": "invalid-token"})
+        delete_page = client.get("/students/")
+        token_match = re.search(
+            rb'name="csrf_token"\s+value="([^"]+)"',
+            delete_page.data,
+        )
+        assert token_match is not None
+        valid = client.post(
+            target,
+            data={"csrf_token": token_match.group(1).decode()},
+        )
+
+        assert missing.status_code == 400
+        assert invalid.status_code == 400
+        assert valid.status_code == 302
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(Student, student_id) is None
+    finally:
+        test_engine.dispose()
+
+
+def test_course_and_enrollment_deletes_require_valid_csrf_tokens():
+    app, test_engine = create_test_app()
+    app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(student_code="CSRF001", full_name="CSRF Student")
+            course = Course(course_code="CSRF101", title="CSRF Course")
+            session.add_all([student, course])
+            session.flush()
+            enrollment = StudentCourse(
+                student_id=student.id,
+                course_id=course.id,
+            )
+            session.add(enrollment)
+            session.commit()
+            enrollment_id = enrollment.id
+            course_id = course.id
+
+        client = app.test_client()
+        login_as_faculty(client)
+        targets = [
+            f"/enrollments/{enrollment_id}/delete",
+            f"/courses/{course_id}/delete",
+        ]
+        for target in targets:
+            assert client.post(target).status_code == 400
+            assert client.post(
+                target,
+                data={"csrf_token": "invalid-token"},
+            ).status_code == 400
+
+        enrollment_page = client.get("/enrollments/")
+        token_match = re.search(
+            rb'name="csrf_token"\s+value="([^"]+)"',
+            enrollment_page.data,
+        )
+        assert token_match is not None
+        token = token_match.group(1).decode()
+
+        remove_enrollment = client.post(
+            targets[0],
+            data={"csrf_token": token},
+        )
+        remove_course = client.post(
+            targets[1],
+            data={"csrf_token": token},
+        )
+        assert remove_enrollment.status_code == 302
+        assert remove_course.status_code == 302
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(StudentCourse, enrollment_id) is None
+            assert session.get(Course, course_id) is None
+    finally:
+        test_engine.dispose()
+
+
+def test_student_cannot_delete_courses_or_enrollments():
+    app, test_engine = create_test_app()
+    try:
+        with sessionmaker(bind=test_engine)() as session:
+            student = Student(student_code="AUTH001", full_name="Target Student")
+            course = Course(course_code="AUTH101", title="Target Course")
+            session.add_all([student, course])
+            session.flush()
+            enrollment = StudentCourse(
+                student_id=student.id,
+                course_id=course.id,
+            )
+            session.add(enrollment)
+            session.commit()
+            target_student_id = student.id
+            course_id = course.id
+            enrollment_id = enrollment.id
+
+        client = app.test_client()
+        login_as_student(client, test_engine)
+        responses = [
+            client.post(f"/courses/{course_id}/delete"),
+            client.post(f"/enrollments/{enrollment_id}/delete"),
+        ]
+        assert all(response.status_code == 302 for response in responses)
+        with sessionmaker(bind=test_engine)() as session:
+            assert session.get(Student, target_student_id) is not None
+            assert session.get(Course, course_id) is not None
+            assert session.get(StudentCourse, enrollment_id) is not None
     finally:
         test_engine.dispose()
 
@@ -680,6 +1201,8 @@ def test_academic_record_creation_and_report():
 
         assert report_response.status_code == 200
         assert b"Academic Support Report" in report_response.data
+        assert b"Saved academic record (fallback)" in report_response.data
+        assert b"Live attendance and published marks take precedence" in report_response.data
         assert b"Attendance" in report_response.data
         assert b"Assessment Trend" in report_response.data
         assert b"Assignment Completion" in report_response.data
@@ -734,6 +1257,11 @@ def test_what_if_comparison_does_not_modify_saved_record():
             session.add(record)
             session.commit()
             record_id = record.id
+
+        page = client.get(f"/academic/records/{record_id}/what-if")
+        assert page.status_code == 200
+        assert b"Current scenario data" in page.data
+        assert b"Saved academic record (fallback)" in page.data
 
         response = client.post(
             f"/academic/records/{record_id}/what-if",
@@ -1102,9 +1630,15 @@ def test_student_and_faculty_dashboards_render_attendance_and_mark_bars():
         )
         assert student_login.status_code == 200
         assert b"Attendance by subject" in student_login.data
-        assert b"Assessment scores" in student_login.data
+        assert b"Average score by subject" in student_login.data
+        assert b'id="assessmentAverageChart"' in student_login.data
+        assert b"Assessment results" in student_login.data
+        assert b"Marks obtained" in student_login.data
+        assert b"Maximum" in student_login.data
+        assert b"Percentage" in student_login.data
         assert b"100.0%" in student_login.data
-        assert b"24.0 / 30.0 marks" in student_login.data
+        assert b"24.0" in student_login.data
+        assert b"30.0" in student_login.data
         assert f"/student/courses/{ids['course_id']}".encode() in student_login.data
         assert b"View subject details" in student_login.data
     finally:
@@ -1462,8 +1996,8 @@ def test_academic_support_tracks_follow_up_to_completion():
                 ),
                 AcademicRecord(
                     student_course_id=enrollment.id,
-                    attendance_percentage=0,
-                    assessment_scores=[82, 54],
+                    attendance_percentage=100,
+                    assessment_scores=[100, 100],
                     completed_assignments=4,
                     total_assignments=10,
                 ),
@@ -1476,6 +2010,8 @@ def test_academic_support_tracks_follow_up_to_completion():
         report = client.get(f"/academic-support/{ids['course_id']}")
 
         assert report.status_code == 200
+        assert b"Saved attendance and assessment values are not used as fallbacks" in report.data
+        assert b"Attendance is 0.0%, below the configured threshold" in report.data
         assert b"Review recent assessments with the student" in report.data
         assert b"Record a support follow-up" in report.data
         assert b"&#39;recommendation&#39;" not in report.data
@@ -1511,6 +2047,58 @@ def test_academic_support_tracks_follow_up_to_completion():
         with sessionmaker(bind=test_engine)() as session:
             follow_up = session.get(SupportFollowUp, follow_up_id)
             assert follow_up.status == "completed"
+    finally:
+        test_engine.dispose()
+
+
+def test_academic_support_loads_student_inputs_in_batched_queries():
+    app, test_engine = create_test_app()
+    try:
+        ids = create_analytics_fixture(test_engine)
+        with sessionmaker(bind=test_engine)() as session:
+            second_student = Student(
+                student_code="ANALYTICS002",
+                full_name="Second Analytics Student",
+            )
+            session.add(second_student)
+            session.flush()
+            session.add(
+                StudentCourse(
+                    student_id=second_student.id,
+                    course_id=ids["course_id"],
+                )
+            )
+            session.commit()
+
+        client = app.test_client()
+        login_as_faculty(client)
+        table_queries = {
+            "attendance_entries": 0,
+            "assessment_marks": 0,
+            "academic_records": 0,
+        }
+
+        def count_input_queries(
+            _connection, _cursor, statement, _parameters, _context, _executemany
+        ):
+            normalized = statement.lower()
+            for table_name in table_queries:
+                if table_name in normalized:
+                    table_queries[table_name] += 1
+
+        event.listen(test_engine, "before_cursor_execute", count_input_queries)
+        try:
+            response = client.get(f"/academic-support/{ids['course_id']}")
+        finally:
+            event.remove(test_engine, "before_cursor_execute", count_input_queries)
+
+        assert response.status_code == 200
+        assert b"Second Analytics Student" in response.data
+        assert table_queries == {
+            "attendance_entries": 1,
+            "assessment_marks": 1,
+            "academic_records": 1,
+        }
     finally:
         test_engine.dispose()
 

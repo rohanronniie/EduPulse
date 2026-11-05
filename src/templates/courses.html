@@ -23,12 +23,17 @@
     </p>
 
     {% if courses %}
+        <label class="table-search" for="courseFilter">
+            <span>Find a course</span>
+            <input id="courseFilter" type="search" data-table-filter="courseDirectory" placeholder="Search by course title or code">
+        </label>
         <div class="table-wrapper">
-            <table class="data-table">
+            <table class="data-table management-table" id="courseDirectory">
                 <thead>
                     <tr>
                         <th>Course Code</th>
                         <th>Course Title</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -36,11 +41,23 @@
                         <tr>
                             <td class="student-code">{{ course.course_code }}</td>
                             <td>{{ course.title }}</td>
+                            <td>
+                                <div class="management-page-actions">
+                                <a class="button button-secondary" href="{{ url_for('courses.edit_course', course_id=course.id) }}">Edit</a>
+                                <form method="post" class="row-action-form"
+                                      action="{{ url_for('courses.delete_course', course_id=course.id) }}"
+                                      data-confirm="Delete {{ course.course_code }} — {{ course.title }}? Courses with enrollments, attendance, or assessments are retained.">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="button button-danger" type="submit">Delete</button>
+                                </form>
+                                </div>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        <p class="filter-empty" data-filter-empty="courseDirectory" hidden>No courses match this search.</p>
     {% else %}
         <div class="empty-state">
             <h3>No courses yet</h3>

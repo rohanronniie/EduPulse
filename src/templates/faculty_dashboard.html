@@ -23,26 +23,31 @@
 
 <section class="dashboard-grid">
     <article class="card">
+        <span class="stat-icon" aria-hidden="true"><svg><use href="#icon-courses"/></svg></span>
         <p class="stat-label">Assigned Subjects</p>
         <h2>{{ courses|length }}</h2>
     </article>
 
     <article class="card">
+        <span class="stat-icon" aria-hidden="true"><svg><use href="#icon-students"/></svg></span>
         <p class="stat-label">Enrolled Students</p>
         <h2>{{ enrolled_student_count }}</h2>
     </article>
 
     <article class="card">
+        <span class="stat-icon" aria-hidden="true"><svg><use href="#icon-attendance"/></svg></span>
         <p class="stat-label">Attendance Sessions</p>
         <h2>{{ session_count }}</h2>
     </article>
 
     <article class="card">
+        <span class="stat-icon" aria-hidden="true"><svg><use href="#icon-assessments"/></svg></span>
         <p class="stat-label">Assessments</p>
         <h2>{{ assessment_count }}</h2>
     </article>
 
     <article class="card">
+        <span class="stat-icon" aria-hidden="true"><svg><use href="#icon-support"/></svg></span>
         <p class="stat-label">Open follow-ups</p>
         <h2>{{ open_follow_up_count }}</h2>
         <p class="stat-description">Support steps still in progress</p>
@@ -125,7 +130,7 @@
     </article>
 </section>
 
-<section class="card">
+<section class="card dashboard-subjects-card">
     <h2>My Assigned Subjects</h2>
 
     {% if courses %}
@@ -148,7 +153,10 @@
             </table>
         </div>
     {% else %}
-        <p>No subjects have been assigned to your account yet.</p>
+        <div class="empty-state" role="status">
+            <h3>No assigned subjects yet</h3>
+            <p>Your course list and subject metrics will appear here after a course is assigned to your account.</p>
+        </div>
     {% endif %}
 </section>
 {% endblock %}

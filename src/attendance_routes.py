@@ -1,4 +1,5 @@
 
+from collections import Counter
 from datetime import date
 
 from flask import (
@@ -11,6 +12,7 @@ from flask import (
     url_for,
 )
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from src.auth_routes import get_current_user, role_required
 from src.models import Course, Student, StudentCourse
@@ -75,6 +77,12 @@ def list_sessions(course_id):
                 AttendanceSession.id.desc(),
             )
         ).all()
+        date_counts = Counter(item.session_date for item in sessions)
+        duplicate_dates = {
+            session_date
+            for session_date, count in date_counts.items()
+            if count > 1
+        }
 
         entry_counts = dict(
             db.execute(
@@ -96,6 +104,7 @@ def list_sessions(course_id):
             course=course,
             sessions=sessions,
             entry_counts=entry_counts,
+            duplicate_dates=duplicate_dates,
         )
 
 
@@ -194,31 +203,35 @@ def take_attendance(course_id):
             if attendance_session is None:
                 return "Attendance session not found.", 404
 
-        duplicate_query = select(AttendanceSession.id).where(
-            AttendanceSession.course_id == course_id,
-            AttendanceSession.session_date == session_date,
-            AttendanceSession.topic == topic,
+        date_is_unchanged = (
+            attendance_session is not None
+            and attendance_session.session_date == session_date
         )
-        if attendance_session is not None:
-            duplicate_query = duplicate_query.where(
-                AttendanceSession.id != attendance_session.id
+        duplicate_session = None
+        if not date_is_unchanged:
+            duplicate_query = select(AttendanceSession.id).where(
+                AttendanceSession.course_id == course_id,
+                AttendanceSession.session_date == session_date,
             )
-        duplicate_session = db.scalar(duplicate_query)
-        if attendance_session is not None and duplicate_session is not None:
+            if attendance_session is not None:
+                duplicate_query = duplicate_query.where(
+                    AttendanceSession.id != attendance_session.id
+                )
+            duplicate_session = db.scalar(duplicate_query)
+        if duplicate_session is not None:
             flash(
-                "Another attendance session already uses this course, date, and topic.",
+                (
+                    "Attendance is already recorded for this course and date. "
+                    "Choose the saved session from the sessions list to correct it."
+                ),
                 "error",
             )
             return redirect(
                 url_for(
-                    "attendance.take_attendance",
+                    "attendance.list_sessions",
                     course_id=course_id,
-                    session_id=attendance_session.id,
                 )
             )
-
-        if attendance_session is None and duplicate_session is not None:
-            attendance_session = db.get(AttendanceSession, duplicate_session)
 
         submitted_entries = []
         for student in students:
@@ -270,7 +283,18 @@ def take_attendance(course_id):
             else:
                 entry.status = status
 
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            flash(
+                "Attendance could not be saved because a conflicting session "
+                "or status was recorded. Review the sessions list and try again.",
+                "error",
+            )
+            return redirect(
+                url_for("attendance.list_sessions", course_id=course_id)
+            )
 
         flash(
             (

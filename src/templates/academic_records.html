@@ -5,12 +5,17 @@
 <section class="page-header">
     <h1>Academic Records</h1>
     <p>Recorded academic information for enrolled students.</p>
-    <a href="{{ url_for('academic.create_record') }}">Add Academic Record</a>
+    <a class="button" href="{{ url_for('academic.create_record') }}">Add academic record</a>
 </section>
 
 <section class="panel">
     {% if records %}
-        <table>
+        <label class="table-search" for="academicRecordFilter">
+            <span>Find a record</span>
+            <input id="academicRecordFilter" type="search" data-table-filter="academicRecordDirectory" placeholder="Search by student or course">
+        </label>
+        <div class="table-wrapper">
+        <table class="management-table" id="academicRecordDirectory">
             <thead>
                 <tr>
                     <th>Student</th>
@@ -38,6 +43,8 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
+        <p class="filter-empty" data-filter-empty="academicRecordDirectory" hidden>No records match this search.</p>
     {% else %}
         <p>No academic records have been added yet.</p>
     {% endif %}

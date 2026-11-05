@@ -1,14 +1,14 @@
 
 {% extends "base.html" %}
 
-{% block title %}Add Course | EduPulse{% endblock %}
-{% block topbar_title %}Course Registration{% endblock %}
+{% block title %}{{ 'Edit Course' if course else 'Add Course' }} | EduPulse{% endblock %}
+{% block topbar_title %}{{ 'Edit Course' if course else 'Course Registration' }}{% endblock %}
 
 {% block content %}
 <div class="page-heading">
     <div>
-        <h1>Create a Course</h1>
-        <p>Add a course to the EduPulse course directory.</p>
+        <h1>{{ 'Edit Course' if course else 'Create a Course' }}</h1>
+        <p>{{ 'Update course details; existing student and academic records remain attached.' if course else 'Add a course to the EduPulse course directory.' }}</p>
     </div>
 </div>
 
@@ -18,7 +18,7 @@
         Enter a unique course code and course title.
     </p>
 
-    <form method="post">
+    <form method="post" action="{{ url_for('courses.edit_course', course_id=course.id) if course else url_for('courses.create_course') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label for="course_code">Course Code</label>
@@ -29,6 +29,7 @@
                 name="course_code"
                 maxlength="30"
                 placeholder="e.g. 23AI404"
+                value="{{ course.course_code if course else '' }}"
                 required
             >
             <p class="form-help">
@@ -45,13 +46,14 @@
                 name="title"
                 maxlength="100"
                 placeholder="e.g. Machine Learning"
+                value="{{ course.title if course else '' }}"
                 required
             >
         </div>
 
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">
-                Create Course
+                {{ 'Save changes' if course else 'Create Course' }}
             </button>
 
             <a

@@ -23,13 +23,18 @@
     </p>
 
     {% if students %}
+        <label class="table-search" for="studentFilter">
+            <span>Find a student</span>
+            <input id="studentFilter" type="search" data-table-filter="studentDirectory" placeholder="Search by name or student code">
+        </label>
         <div class="table-wrapper">
-            <table class="data-table">
+            <table class="data-table management-table" id="studentDirectory">
                 <thead>
                     <tr>
                         <th>Student Code</th>
                         <th>Full Name</th>
                         <th>Registered At</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -40,11 +45,23 @@
                             </td>
                             <td>{{ student.full_name }}</td>
                             <td>{{ student.created_at.strftime("%d %b %Y") }}</td>
+                            <td>
+                                <div class="management-page-actions">
+                                <a class="button button-secondary" href="{{ url_for('students.edit_student', student_id=student.id) }}">Edit</a>
+                                <form method="post" class="row-action-form"
+                                      action="{{ url_for('students.delete_student', student_id=student.id) }}"
+                                      data-confirm="Delete {{ student.student_code }} — {{ student.full_name }}? This is allowed only when no enrollments, login, or academic history is linked.">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="button button-danger" type="submit">Delete</button>
+                                </form>
+                                </div>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        <p class="filter-empty" data-filter-empty="studentDirectory" hidden>No students match this search.</p>
     {% else %}
         <div class="empty-state">
             <h3>No students yet</h3>

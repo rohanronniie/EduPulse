@@ -1,8 +1,9 @@
 
-from pathlib import Path
+import logging
 import os
+from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 # Store the database in the project root.
@@ -61,10 +62,50 @@ class Base(DeclarativeBase):
     pass
 
 
+def ensure_attendance_date_integrity(bind):
+    """Add a unique course/date index to a clean legacy attendance table."""
+    inspector = inspect(bind)
+    if not inspector.has_table("attendance_sessions"):
+        return
+
+    unique_constraints = inspector.get_unique_constraints(
+        "attendance_sessions"
+    )
+    date_key_exists = any(
+        constraint.get("column_names") == ["course_id", "session_date"]
+        for constraint in unique_constraints
+    )
+    if date_key_exists:
+        return
+
+    with bind.begin() as connection:
+        duplicate = connection.exec_driver_sql(
+            "SELECT course_id, session_date, COUNT(*) "
+            "FROM attendance_sessions "
+            "GROUP BY course_id, session_date "
+            "HAVING COUNT(*) > 1 LIMIT 1"
+        ).first()
+        if duplicate is None:
+            connection.exec_driver_sql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "uq_attendance_sessions_course_date_guard "
+                "ON attendance_sessions (course_id, session_date)"
+            )
+        else:
+            logging.getLogger(__name__).warning(
+                "Attendance date uniqueness was not installed because "
+                "legacy duplicate sessions exist for course %s on %s. "
+                "Review those sessions to enable the database constraint.",
+                duplicate[0],
+                duplicate[1],
+            )
+
+
 def initialize_database():
-    """Create any database tables not yet present."""
+    """Create missing tables and safely enforce attendance date uniqueness."""
     from src import models
     from src import academic_models
     from src import portal_models
 
     Base.metadata.create_all(bind=engine)
+    ensure_attendance_date_integrity(engine)

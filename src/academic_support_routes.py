@@ -1,4 +1,5 @@
 
+from collections import defaultdict
 from datetime import date
 
 from flask import (
@@ -11,7 +12,7 @@ from flask import (
     request,
     url_for,
 )
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 
 from src.academic_engine import (
     generate_academic_report,
@@ -101,42 +102,52 @@ def course_report(course_id):
                 follow_up.student_course_id, []
             ).append(follow_up)
 
-        reports = []
+        enrollment_rows = db.execute(
+            select(StudentCourse, Student)
+            .join(Student, Student.id == StudentCourse.student_id)
+            .where(StudentCourse.course_id == course_id)
+            .order_by(StudentCourse.id)
+        ).all()
+        enrollment_ids = [
+            enrollment.id for enrollment, _student in enrollment_rows
+        ]
+        student_ids = [
+            student.id for _enrollment, student in enrollment_rows
+        ]
 
-        for enrollment in enrollments:
-            student = db.get(Student, enrollment.student_id)
-            if student is None:
-                continue
-
-            # Calculate attendance only from this student's records
-            # for this specific course.
+        attendance_by_student = {}
+        if student_ids:
             attendance_rows = db.execute(
-                select(AttendanceEntry.status)
+                select(
+                    AttendanceEntry.student_id,
+                    func.count(AttendanceEntry.id),
+                    func.sum(
+                        case(
+                            (AttendanceEntry.status.in_(("present", "late")), 1),
+                            else_=0,
+                        )
+                    ),
+                )
                 .join(
                     AttendanceSession,
                     AttendanceSession.id == AttendanceEntry.session_id,
                 )
                 .where(
                     AttendanceSession.course_id == course_id,
-                    AttendanceEntry.student_id == student.id,
+                    AttendanceEntry.student_id.in_(student_ids),
                 )
+                .group_by(AttendanceEntry.student_id)
             ).all()
+            attendance_by_student = {
+                student_id: (total or 0, attended or 0)
+                for student_id, total, attended in attendance_rows
+            }
 
-            total_sessions = len(attendance_rows)
-            attended_sessions = sum(
-                status in ("present", "late")
-                for (status,) in attendance_rows
-            )
-
-            attendance_percentage = (
-                attended_sessions / total_sessions * 100
-                if total_sessions
-                else None
-            )
-
-            # Use published marks only, in chronological order.
+        scores_by_student = defaultdict(list)
+        if student_ids:
             published_marks = db.execute(
                 select(
+                    AssessmentMark.student_id,
                     AssessmentMark.marks,
                     Assessment.max_marks,
                 )
@@ -147,22 +158,44 @@ def course_report(course_id):
                 .where(
                     Assessment.course_id == course_id,
                     Assessment.published.is_(True),
-                    AssessmentMark.student_id == student.id,
+                    AssessmentMark.student_id.in_(student_ids),
                 )
-                .order_by(Assessment.assessment_date, Assessment.id)
+                .order_by(
+                    AssessmentMark.student_id,
+                    Assessment.assessment_date,
+                    Assessment.id,
+                )
             ).all()
+            for student_id, marks, max_marks in published_marks:
+                scores_by_student[student_id].append(
+                    round((marks / max_marks) * 100, 2)
+                )
 
-            assessment_scores = [
-                round((marks / max_marks) * 100, 2)
-                for marks, max_marks in published_marks
-            ]
+        records_by_enrollment = {}
+        if enrollment_ids:
+            records_by_enrollment = {
+                record.student_course_id: record
+                for record in db.scalars(
+                    select(AcademicRecord).where(
+                        AcademicRecord.student_course_id.in_(enrollment_ids)
+                    )
+                ).all()
+            }
+
+        reports = []
+        for enrollment, student in enrollment_rows:
+            total_sessions, attended_sessions = attendance_by_student.get(
+                student.id, (0, 0)
+            )
+            attendance_percentage = (
+                attended_sessions / total_sessions * 100
+                if total_sessions
+                else None
+            )
+            assessment_scores = scores_by_student.get(student.id, [])
 
             # Assignment completion comes from the existing academic record.
-            academic_record = db.scalar(
-                select(AcademicRecord).where(
-                    AcademicRecord.student_course_id == enrollment.id
-                )
-            )
+            academic_record = records_by_enrollment.get(enrollment.id)
 
             if academic_record is None:
                 completed_assignments = 0

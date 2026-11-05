@@ -49,7 +49,7 @@ Faculty can explore hypothetical changes to attendance, assessment scores, and a
 
 - Role-based authentication for faculty and students.
 - Faculty access to assigned courses, attendance management, assessment creation, marks entry, and result publishing.
-- Attendance sessions can be reopened and corrected; recording the same course, date, and topic updates the existing session.
+- Attendance sessions are unique per course and class date. Corrections require opening a saved session; legacy duplicate dates are flagged for review rather than merged automatically.
 - Student access to their academic information and published assessment results.
 - Subject pages group published marks with dated attendance history.
 - Access restrictions that prevent students from opening faculty-only pages.
@@ -246,7 +246,7 @@ Configure these environment variables on the hosting platform:
 - `EDUPULSE_DATABASE_URL` should point to a persistent PostgreSQL service using `postgresql+psycopg://...` for a public deployment. SQLite remains the default for local development.
 - `PORT` is normally provided by the host.
 
-The app creates missing tables at startup, but it does not include a versioned migration system. Existing data, infrastructure, domain/TLS, backups, monitoring, and privacy requirements must be reviewed before a public launch. Do not seed the demo cohort in production.
+The app creates missing tables at startup and adds attendance date uniqueness to existing databases only when their data has no duplicate course/date rows. Legacy collisions are preserved and logged for review; the attendance sessions page flags the affected dates. The app does not include a versioned migration system. Existing data, infrastructure, domain/TLS, backups, monitoring, and privacy requirements must be reviewed before a public launch. Do not seed the demo cohort in production.
 
 ## Limitations and responsible use
 
