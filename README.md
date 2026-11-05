@@ -26,9 +26,11 @@ These screenshots are from the running application populated with the included s
 
 | Faculty dashboard | Student dashboard |
 |---|---|---|
-| [![Faculty dashboard](docs/images/faculty-dashboard.png)](docs/images/faculty-dashboard.png) | [![Student dashboard](docs/images/student-dashboard.png)](docs/images/student-dashboard.png) |
+| [![Faculty dashboard](docs/images/faculty-dashboard.png)](docs/images/faculty-dashboard.png) 
+| [![Student dashboard](docs/images/student-dashboard.png)](docs/images/student-dashboard.png) |
 | Academic analytics | Student assessment results |
-| [![Academic analytics](docs/images/analytics-dashboard.png)](docs/images/analytics-dashboard.png) | [![Student assessment results](docs/images/student-assessment-results.png)](docs/images/student-assessment-results.png) |
+| [![Academic analytics](docs/images/analytics-dashboard.png)](docs/images/analytics-dashboard.png) 
+| [![Student assessment results](docs/images/student-assessment-results.png)](docs/images/student-assessment-results.png) |
 | Student subject detail | |
 | [![Student subject detail](docs/images/student-subject-detail.png)](docs/images/student-subject-detail.png) | |
 
