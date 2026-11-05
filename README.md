@@ -18,15 +18,19 @@ The project focuses on three practical engineering concerns: **explainable evalu
 
 ## Screenshots
 
-These screenshots are from the running application populated with the included synthetic demo cohort. They show real faculty dashboards, course analytics, and a student's dated subject record.
+These screenshots are from the running application populated with the included synthetic demo cohort. They show the current faculty and student workflows, including published assessment results.
 
 ### Sign in
 
-![EduPulse sign-in page](docs/images/sign-in.svg)
+![EduPulse sign-in page](docs/images/sign-in.png)
 
-| Faculty dashboard | Academic analytics | Student subject detail |
+| Faculty dashboard | Student dashboard |
 |---|---|---|
-| [![Faculty dashboard](docs/images/faculty-dashboard.png)](docs/images/faculty-dashboard.png) | [![Academic analytics](docs/images/analytics-dashboard.png)](docs/images/analytics-dashboard.png) | [![Student subject detail](docs/images/student-subject-detail.png)](docs/images/student-subject-detail.png) |
+| [![Faculty dashboard](docs/images/faculty-dashboard.png)](docs/images/faculty-dashboard.png) | [![Student dashboard](docs/images/student-dashboard.png)](docs/images/student-dashboard.png) |
+| Academic analytics | Student assessment results |
+| [![Academic analytics](docs/images/analytics-dashboard.png)](docs/images/analytics-dashboard.png) | [![Student assessment results](docs/images/student-assessment-results.png)](docs/images/student-assessment-results.png) |
+| Student subject detail | |
+| [![Student subject detail](docs/images/student-subject-detail.png)](docs/images/student-subject-detail.png) | |
 
 To explore the same workflows locally, follow [Getting started](#getting-started) and the demo account instructions below.
 
